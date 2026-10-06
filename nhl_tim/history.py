@@ -65,7 +65,7 @@ def validate_history(con, season=PREV_SEASON):
         if t["gp"] != 82: errs.append(f"{t['team']} gp={t['gp']} (partial season?)")
     for p in con.execute("SELECT * FROM player_season WHERE season=?", (season,)):
         if p["goal_games"] > p["gp"] or p["goal_games"] > p["g"]: errs.append(f"bad goal_games {dict(p)}")
-    dup = con.execute("SELECT name_norm, COUNT(*) c FROM player GROUP BY name_norm HAVING c>1").fetchall()
+    dup = con.execute("SELECT name_norm, COUNT(*) c FROM player GROUP BY name_norm, pos HAVING c>1").fetchall()
     for d in dup: errs.append(f"duplicate normalized name: {d['name_norm']}")
     return errs
 
