@@ -39,3 +39,11 @@ python -m nhl_tim.cli update_daily
 python -m nhl_tim.cli build_site     # or build_table for HTML/CSV table
 ```
 Update `data/pools.csv` first (local only, gitignored).
+
+## Daily publish
+1. Update `data/pools.csv` with today's three pools.
+2. Run `Publish Board.bat` (or `update_daily`, `build_site`, then commit and push `docs/`).
+3. Friends view the board at the repo's GitHub Pages URL (Settings -> Pages -> Deploy from branch `main`, folder `/docs`).
+
+The published page contains sportsbook odds; check your odds provider's terms before sharing it widely.
+Estimates only, not betting advice.
