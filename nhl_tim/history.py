@@ -68,3 +68,14 @@ def validate_history(con, season=PREV_SEASON):
     dup = con.execute("SELECT name_norm, COUNT(*) c FROM player GROUP BY name_norm HAVING c>1").fetchall()
     for d in dup: errs.append(f"duplicate normalized name: {d['name_norm']}")
     return errs
+
+
+def refresh_players(season, force=False):
+    """Add current-season skaters (rookies, new signings) to player table; current team wins."""
+    con = connect()
+    for r in nhl_api.skaters(season, force):
+        con.execute("INSERT OR REPLACE INTO player VALUES(?,?,?,?,?)",
+                    (r["playerId"], r["skaterFullName"], norm_name(r["skaterFullName"]),
+                     "D" if r["positionCode"] == "D" else "F", r["teamAbbrevs"].split(",")[-1]))
+    con.commit()
+    return con
