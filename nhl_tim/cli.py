@@ -10,7 +10,7 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(prog="nhl_tim")
     ap.add_argument("cmd", choices=["update_history", "validate", "update_power_play_units",
-                                    "update_daily", "build_table"])
+                                    "update_daily", "build_table", "build_site"])
     ap.add_argument("--date", default=None, help="YYYY-MM-DD (ET); default today")
     ap.add_argument("--force", action="store_true", help="refetch cached history")
     a = ap.parse_args()
@@ -27,6 +27,10 @@ def main():
         print(f"{date}: games={s['games']} atg_rows={s['atg']} atg_unmatched={len(s['atg_unmatched'])} goalie_rows={n}")
         print("atg unmatched:", sorted(set(s["atg_unmatched"]))[:40])
         print("goalie unmatched:", um)
+        return
+    if a.cmd == "build_site":
+        from .output.site import build_site
+        print("%s (%d rows)" % build_site(date))
         return
     if a.cmd == "build_table":
         from .output.table import build_table

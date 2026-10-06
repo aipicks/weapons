@@ -15,6 +15,7 @@ echo SGO_API_KEY=... > .env
 | `update_power_play_units` | manual, every few weeks | Daily Faceoff PP1/PP2 for all 32 teams -> local DB, `last_pp_update`, history kept |
 | `update_daily` | every day | current-season stats (NHL API), games/odds/anytime-goal (SportsGameOdds, 1 slate call), projected goalies (RotoWire) |
 | `build_table` | every day | writes `data/table_<date>.html` + `.csv` |
+| `build_site` | every day, after `update_daily` | writes `data/site_<date>.html`, a mobile dashboard (single file, data embedded) |
 | `validate` | any time | checks full-season history |
 
 ## Pools
@@ -25,3 +26,16 @@ Copy `data/pools.csv.example` to `data/pools.csv` (`pool,player,team`), pool = 1
 - Implied team totals: total shifted by over/under lean, split by de-vigged moneyline (`odds_math.py`).
 - Player matching: normalized name + team (+ position for same-name players).
 - Goalie colours: ranks among qualified (>=20 GP) goalies in thirds; current-season ranks include any goalie with GP>=1 (small sample, shrunk in the model).
+
+## Tests
+```
+pip install pytest
+python -m pytest tests
+```
+
+## Daily routine
+```
+python -m nhl_tim.cli update_daily
+python -m nhl_tim.cli build_site     # or build_table for HTML/CSV table
+```
+Update `data/pools.csv` first (local only, gitignored).

@@ -1,0 +1,172 @@
+<title>Tims Pick Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky pool tabs over a ranked list; each row expands into the full stat sheet.
+   Green = good for the shooter, red = bad, gray = neutral, everywhere. Accent (selection only) is ice blue. */
+:root{
+  --bg:#eef2f6; --surface:#ffffff; --surface2:#e4eaf1; --line:#d3dce6;
+  --fg:#0f1b2a; --muted:#5b6b7e; --accent:#1763c7; --accent-ink:#ffffff;
+  --good:#17813f; --good-bg:#cdeedb; --good-bar:#22a455;
+  --bad:#b4232c; --bad-bg:#f8d2d4; --bad-bar:#d8404a;
+  --warn:#8a5a00; --warn-bg:#fbe9a8; --warn-bar:#e0a712;
+  --mid:#46586c; --mid-bg:#dfe4ea; --mid-bar:#8795a6; --bar-bg:#d9e1ea;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"Barlow",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b141f; --surface:#122030; --surface2:#1a2c40; --line:#243a52;
+  --fg:#e8eef5; --muted:#8aa0b6; --accent:#5aa9ff; --accent-ink:#0b141f;
+  --good:#5be08f; --good-bg:#14452c; --good-bar:#3fc577;
+  --bad:#ff8087; --bad-bg:#58191f; --bad-bar:#f0525c;
+  --warn:#f5cd5a; --warn-bg:#4a3a0c; --warn-bar:#d9a920;
+  --mid:#b3c2d2; --mid-bg:#243447; --mid-bar:#6c8198; --bar-bg:#243a52; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b141f; --surface:#122030; --surface2:#1a2c40; --line:#243a52;
+  --fg:#e8eef5; --muted:#8aa0b6; --accent:#5aa9ff; --accent-ink:#0b141f;
+  --good:#5be08f; --good-bg:#14452c; --good-bar:#3fc577;
+  --bad:#ff8087; --bad-bg:#58191f; --bad-bar:#f0525c;
+  --warn:#f5cd5a; --warn-bg:#4a3a0c; --warn-bar:#d9a920;
+  --mid:#b3c2d2; --mid-bg:#243447; --mid-bar:#6c8198; --bar-bg:#243a52; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;padding-inline:12px;padding-block:0 40px}
+*{box-sizing:border-box}
+.wrap{max-width:980px;margin:0 auto}
+header{padding-block:14px 6px;display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;justify-content:space-between}
+h1{font:700 34px/1 var(--display);letter-spacing:.02em;text-transform:uppercase;margin:0}
+h1 span{color:var(--accent)}
+.sub{color:var(--muted);font:400 12px var(--mono)}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:8px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)}
+.tabs{display:flex;gap:6px;overflow-x:auto}
+.tab,.chip{font:600 17px var(--display);letter-spacing:.04em;text-transform:uppercase;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:8px 16px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.tab[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{font-size:14px;padding:5px 12px}
+.chip[aria-pressed=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.game{font:600 15px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:18px 2px 6px;display:flex;justify-content:space-between}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-top:6px;overflow:hidden}
+.head{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:8px 12px 6px;padding-bottom:4px}
+.rk{font:700 24px var(--display);text-align:center}
+.nm{font:600 17px/1.1 var(--display);letter-spacing:.02em;text-transform:uppercase;min-width:0;overflow-wrap:anywhere}
+.nm small{font:400 12px var(--mono);color:var(--muted);text-transform:none;letter-spacing:0;margin-left:6px;white-space:nowrap}
+.tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.tag{font:500 11px var(--mono);padding:2px 6px;border-radius:4px;background:var(--mid-bg);color:var(--mid)}
+.tag.warn{background:var(--warn-bg);color:var(--warn)} .tag.good{background:var(--good-bg);color:var(--good)} .tag.bad{background:var(--bad-bg);color:var(--bad)}
+.pct{text-align:right;min-width:84px}
+.pct b{display:block;font:700 28px/1 var(--display);font-variant-numeric:tabular-nums}
+.pct i{display:block;font:400 12px var(--mono);color:var(--muted);font-style:normal;margin-top:2px}
+.meter{height:4px;background:var(--bar-bg);grid-column:1/-1;border-radius:3px;margin-top:-2px}
+.meter div{height:100%;border-radius:3px}
+.t-g .rk,.t-g .pct b{color:var(--good)} .t-g .meter div{background:var(--good-bar)}
+.t-m .rk,.t-m .pct b{color:var(--warn)}  .t-m .meter div{background:var(--warn-bar)}
+.t-r .rk,.t-r .pct b{color:var(--bad)}  .t-r .meter div{background:var(--bad-bar)}
+.detail{border-top:1px solid var(--line);padding:6px 12px 10px;font-size:13px}
+.ln{display:flex;gap:8px;padding:3px 0;align-items:baseline;border-top:1px dashed var(--line)}
+.ln:first-child{border-top:0}
+.ln .lab{flex:0 0 46px;color:var(--muted);font:500 10.5px var(--mono);letter-spacing:.04em;text-transform:uppercase}
+.ln .v{min-width:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;line-height:1.4}
+.sub2{display:block}
+.sep{color:var(--muted);padding:0 2px}
+.c-red{background:var(--bad-bg);color:var(--bad);padding:0 4px;border-radius:3px}
+.c-green{background:var(--good-bg);color:var(--good);padding:0 4px;border-radius:3px}
+.c-gray{background:var(--warn-bg);color:var(--warn);padding:0 4px;border-radius:3px}
+.c-na{background:var(--mid-bg);color:var(--mid);padding:0 4px;border-radius:3px}
+.whyl{margin:5px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px}
+.pptag{margin-left:8px;font-size:12px;vertical-align:middle}
+.whyl li{font-size:11.5px;padding:1px 6px;border-radius:4px}
+.whyl li.z{background:var(--warn-bg);color:var(--warn)} .whyl li.p{background:var(--good-bg);color:var(--good)} .whyl li.n{background:var(--bad-bg);color:var(--bad)}
+.legend{color:var(--muted);font-size:12px;margin-top:22px;line-height:1.5}
+.key{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.empty{padding:40px 0;text-align:center;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.meter div{transition:width .4s}}
+</style>
+<div class="wrap">
+  <header>
+    <h1>Pick <span>Board</span></h1>
+    <div class="sub" id="sub"></div>
+  </header>
+  <div class="bar">
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="tools">
+      <button class="chip" id="by" aria-pressed="false">Group by game</button>
+      <span class="sub" id="count"></span>
+    </div>
+  </div>
+  <main id="list"></main>
+  <div class="legend">
+    <div class="key"><span class="tag good">Top third of pool</span><span class="tag warn">Middle third</span><span class="tag bad">Bottom third</span></div>
+    <p>Ranks and percentages are within each pick pool. Model P(goal) blends the sportsbook anytime-goal consensus (vig removed) with goal-game rate, power-play unit, team implied total, opponent defense and goalie. Weights are starting priors, not fitted. Matchup colors: red = tough for the shooter, green = favorable. Market and goal-game chips compare a player with the rest of his own pool (top third strong/high, bottom third weak/low), so a Pick #3 depth player can be "strong" at 18%. Opponent defense: ranks 1–10 red, 11–20 gray, 21–32 green. Goalie ranks use thirds of qualified goalies (20+ GP last season). * = changed teams since last season. "Projected" goalie means RotoWire lists him but the team has not confirmed.</p>
+  </div>
+</div>
+<script>
+const D = /*__DATA__*/null;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pools = [...new Set(D.rows.map(r => r.pool))].sort();
+let pool = pools[0], grouped = false;
+try { const s = JSON.parse(localStorage.getItem('pb')||'{}'); if (pools.includes(s.pool)) pool = s.pool; grouped = !!s.grouped; } catch(e){}
+const save = () => { try { localStorage.setItem('pb', JSON.stringify({pool, grouped})); } catch(e){} };
+
+const label = p => p ? 'Pick #'+p : 'All priced';
+const col = c => c ? `c-${c}` : 'c-gray';
+const rk = (v, c) => v ? `<span class="${col(c)}">#${v}</span>` : '<span class="c-na">unranked</span>';
+const PP = {1:['PP1 ✅','good'], 2:['PP2 ✔','warn'], 0:['NO PP UNIT','bad']};
+const GL = {Confirmed:['G: Confirmed','good'], Projected:['G: Projected',''], Unknown:['G: Unknown','bad']};
+
+function gline(s, extra){
+  if (!s) return '<span class="c-na">N/A</span>';
+  return `${s.gaa.toFixed(2)} GAA ${rk(s.gr, s.gc)}<span class="sep">|</span>${String(s.sv.toFixed(3)).replace(/^0/,'')} SV% ${rk(s.svr, s.svc)}<span class="sep">|</span>${s.gp} GP${s.starts!=null?' / '+s.starts+' GS':''}`;
+}
+
+function row(r){
+  const [ppt, ppc] = PP[r.pp];
+  const g = r.goalie ? GL[r.goalie.status] : ['G: Unknown','bad'];
+  const why = r.why.map(([p,t]) => `<li class="${p}">${esc(t)}</li>`).join('');
+  const sp = '<span class="sep">|</span>';
+  const s25 = r.s25 ? `${r.s25.gp} GP ${sp} ${r.s25.sog} SOG ${sp} ${r.s25.gg} Goal Games (<b>${r.s25.ggp}%</b>)` : 'N/A';
+  const pct26 = r.s26.gp ? ` (<b>${(r.s26.gg/r.s26.gp*100).toFixed(1)}%</b>)` : '';
+  const s26 = `${r.s26.gp} GP ${sp} ${r.s26.sog} SOG ${sp} ${r.s26.gg==null?'?':r.s26.gg} Goal Games${r.s26.gg==null?'':pct26}`;
+  const gm = r.game ? `Total ${r.game.total} (O ${r.game.over})${r.game.fav?` // ${r.game.fav} ${r.game.ml}`:''}` : 'N/A';
+  const any = r.any ? `${r.any.am} (${r.any.pr}%)` : 'N/A';
+  const od = r.opp_d ? `<span class="${col(r.opp_d.c)}">${r.opp_d.ga.toFixed(2)} GA/G (#${r.opp_d.rank})</span>` : 'N/A';
+  const gb = r.goalie ? `<b>${esc(r.goalie.name)} — ${r.goalie.status}</b>
+      <span class="sub2">25–26: ${gline(r.goalie.p)}</span>
+      <span class="sub2">26–27: ${gline(r.goalie.c)}</span>` : 'No goalie listed yet';
+  return `<article class="row t-${r.tier}">
+    <div class="head">
+      <span class="rk">${r.rank}</span>
+      <span><span class="nm">${esc(r.name)}${r.chg?'*':''}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span></span>
+        <ul class="whyl">${why}</ul></span>
+      <span class="pct"><b>${r.p.toFixed(1)}%</b><i>${r.game_name.replace(' @ ','@')} ${r.time.replace(' PM','')}</i></span>
+      <span class="meter"><div style="width:${Math.min(100, r.p*2)}%"></div></span>
+    </div>
+    <div class="detail">
+      <div class="ln"><span class="lab">25–26</span><span class="v">${s25}</span></div>
+      <div class="ln"><span class="lab">26–27</span><span class="v">${s26}</span></div>
+      <div class="ln"><span class="lab">Bets</span><span class="v">Anytime ${any} ${sp} ${gm} ${sp} ${r.team} ${r.xg!=null?r.xg.toFixed(2):'?'} xG</span></div>
+      <div class="ln"><span class="lab">Opp D</span><span class="v">${r.opp} ${od}</span></div>
+      <div class="ln"><span class="lab">Goalie</span><span class="v">${gb}</span></div>
+    </div></article>`;
+}
+
+function render(){
+  const rows = D.rows.filter(r => r.pool === pool);
+  let html = '';
+  if (!rows.length) html = '<p class="empty">No players for this pool.</p>';
+  else if (grouped) {
+    const games = [...new Set(rows.slice().sort((a,b)=>a.start.localeCompare(b.start)||a.eid.localeCompare(b.eid)).map(r=>r.eid))];
+    for (const g of games) {
+      const gr = rows.filter(r=>r.eid===g).sort((a,b)=>a.rank-b.rank);
+      html += `<div class="game"><span>${gr[0].game_name}</span><span>${gr[0].time} ET</span></div>` + gr.map(row).join('');
+    }
+  } else html = rows.slice().sort((a,b)=>a.rank-b.rank).map(row).join('');
+  $('#list').innerHTML = html;
+  $('#count').textContent = rows.length + ' players';
+  $('#tabs').innerHTML = pools.map(p => `<button class="tab" role="tab" aria-selected="${p===pool}" data-p="${p}">${label(p)}</button>`).join('');
+  $('#by').setAttribute('aria-pressed', grouped);
+}
+$('#tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (!t) return; pool = +t.dataset.p; save(); render(); scrollTo({top:0}); });
+$('#by').onclick = () => { grouped = !grouped; save(); render(); };
+const dt = new Date(D.date + 'T12:00:00');
+$('#sub').textContent = dt.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}) + ' · odds ' + (D.meta.daily_updated||'?').slice(11,16) + ' UTC · PP units ' + (D.meta.last_pp_update||'?').slice(0,10);
+render();
+</script>

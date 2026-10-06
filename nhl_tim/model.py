@@ -136,22 +136,37 @@ def build_rows(con, date):
         else:
             p_mkt, pm = None, p_fund
 
-        # --- reasons ---
+        # --- reasons: (sort weight, text, class p=positive / z=neutral / n=negative) ---
+        def cls(x, band):
+            return "p" if x > band else "n" if x < -band else "z"
         reasons = []
         if p_mkt is not None:
-            reasons.append((logit(p_mkt) - logit(W["league_goal_game"]),
-                            ("Strong" if p_mkt > 0.3 else "Weak" if p_mkt < 0.2 else "Average") + " anytime-goal market"))
+            m = "p" if p_mkt > 0.3 else "n" if p_mkt < 0.2 else "z"
+            reasons.append((logit(p_mkt) - logit(W["league_goal_game"]), m,
+                            ("Strong" if m == "p" else "Weak" if m == "n" else "Average") + " anytime-goal market", "mkt"))
+        else:
+            reasons.append((-0.4, "z", "No anytime-goal odds listed (fundamentals only)", "nomkt"))
         if prev and prev["gp"]:
-            reasons.append((logit(prev["goal_game_pct"]) - logit(W["league_goal_game"]),
-                            f"{prev['goal_game_pct']*100:.0f}% goal-game rate last season"))
+            d = logit(prev["goal_game_pct"]) - logit(W["league_goal_game"])
+            word = "High" if d > 0.15 else "Low" if d < -0.15 else "Average"
+            reasons.append((d, cls(d, 0.15), f"{word} goal-game rate ({prev['goal_game_pct']*100:.0f}%)", "gg"))
         if pp_unit:
-            reasons.append((parts["power play"] * 3, f"PP{pp_unit}"))
+            reasons.append((parts["power play"] * 3, "p" if pp_unit == 1 else "z", f"PP{pp_unit} role", "pp"))
+        else:
+            reasons.append((-0.3, "n", "No PP unit", "pp"))
         if xg is not None:
-            reasons.append((parts["team total"] * 2, f"{'Favorable' if xg > 3 else 'Low'} team implied total ({xg:.2f})"))
+            d = parts["team total"] * 2
+            word = "High" if d > 0.12 else "Low" if d < -0.12 else "Average"
+            reasons.append((d, cls(d, 0.12), f"{word} team implied total ({xg:.2f})", "xg"))
         if opp_t:
-            reasons.append((parts["opp GA rank"] * 2, f"Opponent ranked {opp_t['ga_rank']} in GA/G"))
+            rkv = opp_t["ga_rank"]
+            c = "n" if rkv <= 10 else "p" if rkv >= 21 else "z"
+            reasons.append(((rkv - 16.5) / 16.5, c,
+                            f"{'Favorable' if c == 'p' else 'Tough' if c == 'n' else 'Average'} opponent GA/G (#{rkv})", "opp"))
         if sv is not None:
-            reasons.append((parts["goalie"] * 2, f"{'Weak' if sv < W['league_sv'] else 'Strong'} opposing goalie ({gp_row['goalie_name']})"))
+            d = parts["goalie"] * 2
+            word = "Weak" if d > 0.1 else "Strong" if d < -0.1 else "Average"
+            reasons.append((d, cls(d, 0.1), f"{word} opposing goalie ({gp_row['goalie_name']})", "gk"))
         reasons.sort(key=lambda r: -abs(r[0]))
 
         prev_team_changed = bool(prev and prev["team"] != team)
@@ -162,8 +177,7 @@ def build_rows(con, date):
             "game_odds": godds[eid]["row"], "xg": xg, "opp_team": opp_t,
             "goalie_proj": gp_row, "goalie": gb,
             "atg_display": fd or (books[0] if books else None), "atg_cons": cons, "atg_best": best,
-            "p_fund": p_fund, "p_mkt": p_mkt, "p": pm, "reasons": [r[1] for r in reasons[:3]],
-            "reasons_signed": [(r[0] > 0, r[1]) for r in reasons[:3]],
+            "p_fund": p_fund, "p_mkt": p_mkt, "p": pm, "all_reasons": reasons,
         })
     # rank within pool
     byp = {}
@@ -174,4 +188,33 @@ def build_rows(con, date):
         for i, r in enumerate(rows):
             r["rank"] = i + 1
             r["pool_n"] = len(rows)
+        _relabel_relative(rows)
+    for r in out:
+        rs = sorted(r.pop("all_reasons"), key=lambda x: -abs(x[0]))
+        r["reasons"] = [x[2] for x in rs[:5]]
+        r["reasons_signed"] = [(x[1], x[2]) for x in rs[:5]]
     return out, missing
+
+
+def _tier(value, values):
+    """terciles within the pool: 'p' top third, 'n' bottom third, else 'z'."""
+    srt = sorted(values)
+    lo, hi = srt[len(srt) // 3], srt[(2 * len(srt)) // 3]
+    return "p" if value >= hi and hi > lo else "n" if value <= lo and hi > lo else "z"
+
+
+def _relabel_relative(rows):
+    """Market and goal-game chips compare players with their own pool, not with league average."""
+    mk = [r["p_mkt"] for r in rows if r["p_mkt"] is not None]
+    gg = [r["prev"]["goal_game_pct"] for r in rows if r["prev"] and r["prev"]["gp"]]
+    for r in rows:
+        new = []
+        for w, c, t, k in r["all_reasons"]:
+            if k == "mkt" and len(mk) >= 3:
+                c = _tier(r["p_mkt"], mk)
+                t = ("Strong" if c == "p" else "Weak" if c == "n" else "Average") + " anytime-goal market"
+            elif k == "gg" and len(gg) >= 3:
+                c = _tier(r["prev"]["goal_game_pct"], gg)
+                t = f"{'High' if c == 'p' else 'Low' if c == 'n' else 'Average'} goal-game rate ({r['prev']['goal_game_pct']*100:.0f}%)"
+            new.append((w, c, t, k))
+        r["all_reasons"] = new
