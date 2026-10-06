@@ -76,7 +76,7 @@ def build_site(date):
     f.write_text(html, encoding="utf-8")
     # standalone variant: opens directly in a browser; always the latest build
     cut = html.index('<div class="wrap">')
-    standalone = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
+    standalone = ('<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8">'
                   '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
                   + html[:cut] + "<style>body{margin:0}</style></head><body>" + html[cut:] + "</body></html>")
     standalone = standalone.replace("<head>", '<head><meta name="robots" content="noindex">', 1)
