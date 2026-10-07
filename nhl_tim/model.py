@@ -104,6 +104,11 @@ def build_rows(con, date):
         xgc = con.execute("SELECT gp, xg FROM player_xg WHERE nhl_id=? AND season=?", (pid, CUR_SEASON)).fetchone()
         toi_p = con.execute("SELECT toi_pg FROM player_toi WHERE nhl_id=? AND season=?", (pid, PREV_SEASON)).fetchone()
         toi_c = con.execute("SELECT toi_pg FROM player_toi WHERE nhl_id=? AND season=?", (pid, CUR_SEASON)).fetchone()
+        def _one(sql, *a):
+            r_ = con.execute(sql, a).fetchone()
+            return r_[0] if r_ else None
+        pp_t = {s: _one("SELECT pp_toi_pg FROM player_pp_toi WHERE nhl_id=? AND season=?", pid, s) for s in (PREV_SEASON, CUR_SEASON)}
+        pk_t = {s: _one("SELECT pk_toi_pg FROM team_pk_toi WHERE team=? AND season=?", opp, s) for s in (PREV_SEASON, CUR_SEASON)}
         pp = con.execute("SELECT unit FROM pp_unit WHERE nhl_id=?", (pid,)).fetchone()
         pp_unit = pp["unit"] if pp else 0
         books = atg.get((eid, pid), [])
@@ -189,7 +194,7 @@ def build_rows(con, date):
             "game_odds": godds[eid]["row"], "xg": xg, "opp_team": opp_t,
             "goalie_proj": gp_row, "goalie": gb,
             "atg_display": fd or (books[0] if books else None), "atg_cons": cons, "atg_best": best,
-            "p_fund": p_fund, "p_mkt": p_mkt, "p": pm, "all_reasons": reasons, "xg_prev": xgp, "xg_cur": xgc,
+            "p_fund": p_fund, "p_mkt": p_mkt, "p": pm, "all_reasons": reasons, "xg_prev": xgp, "xg_cur": xgc, "pp_toi": pp_t, "opp_pk_toi": pk_t,
             "toi_prev": toi_p["toi_pg"] if toi_p else None, "toi_cur": toi_c["toi_pg"] if toi_c else None,
         })
     # rank within pool

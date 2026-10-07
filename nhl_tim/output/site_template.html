@@ -145,6 +145,7 @@ function row(r){
     <div class="detail">
       <div class="ln"><span class="lab">25–26</span><span class="v">${s25}</span></div>
       <div class="ln"><span class="lab">26–27</span><span class="v">${s26}</span></div>
+      <div class="ln"><span class="lab">PP time</span><span class="v">Player 25–26 ${r.ppt.p||'0:00'}/G ${sp} 26–27 ${r.ppt.c||'0:00'}/G<br>${r.opp} PK (shorthanded) 25–26 ${r.ppt.opk_p||'?'}/G ${sp} 26–27 ${r.ppt.opk_c||'?'}/G</span></div>
       <div class="ln"><span class="lab">Bets</span><span class="v">Anytime ${any} ${sp} ${gm} ${sp} ${r.team} ${r.xg!=null?r.xg.toFixed(2):'?'} xG</span></div>
       <div class="ln"><span class="lab">Opp D</span><span class="v">${r.opp} ${od}</span></div>
       <div class="ln"><span class="lab">Goalie</span><span class="v">${gb}</span></div>

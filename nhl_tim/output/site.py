@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from ..config import DATA, ROOT, CUR_SEASON, PRESEASON_D, PRESEASON_D_TIES
+from ..config import DATA, ROOT, CUR_SEASON, PREV_SEASON, PRESEASON_D, PRESEASON_D_TIES
 from ..sources import nhl_api
 from ..db import connect
 from ..model import build_rows
@@ -79,6 +79,8 @@ def build_site(date):
                         "c": team_color(PRESEASON_D[r["opp"]])},
             "opp_c": {"ga": round(oc["ga_pg"], 2), "rank": oc["ga_rank"], "gp": oc["gp"], "n": n_teams,
                       "c": team_color(oc["ga_rank"], n_teams)} if oc else None,
+            "ppt": {"p": _mmss(r["pp_toi"][PREV_SEASON]), "c": _mmss(r["pp_toi"][CUR_SEASON]),
+                    "opk_p": _mmss(r["opp_pk_toi"][PREV_SEASON]), "opk_c": _mmss(r["opp_pk_toi"][CUR_SEASON])},
             "goalie": goalie, "why": [[p, t] for p, t in r["reasons_signed"]],
         })
     payload = {"date": date, "rows": out, "meta": meta, "missing": [m[0] for m in missing]}

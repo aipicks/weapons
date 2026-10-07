@@ -50,6 +50,12 @@ def teams(season, force=False):
 def game_log(nhl_id, season, force=False):
     return get(f"{WEB}/player/{nhl_id}/game-log/{season}/2", f"gl_{season}/{nhl_id}", force)["gameLog"]
 
+def skater_powerplay(season, force=False):
+    return get(f"{STATS}/skater/powerplay?{_q(season)}", f"skater_pp_{season}", force)["data"]
+
+def team_penaltykill(season, force=False):
+    return get(f"{STATS}/team/penaltykill?{_q(season)}", f"team_pk_{season}", force)["data"]
+
 def team_abbrevs(date="2026-04-16", force=False):
     """full team name -> abbrev, from standings snapshot."""
     st = get(f"{WEB}/standings/{date}", f"standings_{date}", force)["standings"]

@@ -142,6 +142,22 @@ def update_toi(con):
                             (r["playerId"], season, r["timeOnIcePerGame"]))
 
 
+def update_pp_time(con):
+    """Player PP time on ice per game, and each team's time shorthanded (penalty kill) per game, in seconds.
+    Previous season cached once; current season refreshed daily."""
+    from .config import PREV_SEASON
+    abbr = nhl_api.team_abbrevs(force=False)
+    for season, force in ((PREV_SEASON, False), (CUR_SEASON, True)):
+        for r in nhl_api.skater_powerplay(season, force):
+            if r.get("ppTimeOnIcePerGame") is not None:
+                con.execute("INSERT OR REPLACE INTO player_pp_toi VALUES(?,?,?)",
+                            (r["playerId"], season, r["ppTimeOnIcePerGame"]))
+        for r in nhl_api.team_penaltykill(season, force):
+            n = r["teamFullName"]
+            if n in abbr and r.get("pkTimeOnIcePerGame") is not None and r["gamesPlayed"] > 0:
+                con.execute("INSERT OR REPLACE INTO team_pk_toi VALUES(?,?,?)", (abbr[n], season, r["pkTimeOnIcePerGame"]))
+
+
 def update_xg(con):
     """Individual expected goals: previous season cached once, current season refreshed daily."""
     for year, season, force in ((2025, 20252026, False), (2026, 20262027, True)):
@@ -154,6 +170,7 @@ def update_daily(date):
     update_current_stats(con)
     update_xg(con)
     update_toi(con)
+    update_pp_time(con)
     update_team_stats(con)
     s = ingest_slate(con, date)
     n, um = ingest_goalies(con, date)
