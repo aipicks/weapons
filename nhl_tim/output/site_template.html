@@ -94,7 +94,7 @@ h1 span{color:var(--accent)}
   <main id="list"></main>
   <div class="legend">
     <div class="key"><span class="tag good">Top third of pool</span><span class="tag warn">Middle third</span><span class="tag bad">Bottom third</span></div>
-    <p>Ranks and percentages are within each pick pool. Model P(goal) blends the sportsbook anytime-goal consensus (vig removed) with goal-game rate, power-play unit, team implied total, opponent defense and goalie. Weights are starting priors, not fitted. Matchup colors: red = tough for the shooter, green = favorable. Market and goal-game chips compare a player with the rest of his own pool (top third strong/high, bottom third weak/low), so a Pick #3 depth player can be "strong" at 18%. Preseason D is a projected defensive-unit ranking for each team and is not used in the model. Opponent defense: ranks 1–10 red, 11–20 gray, 21–32 green. Goalie ranks use thirds of qualified goalies (20+ GP last season). * = changed teams since last season. "Projected" goalie means RotoWire lists him but the team has not confirmed.</p>
+    <p>Ranks and percentages are within each pick pool. Model P(goal) blends the sportsbook anytime-goal consensus (vig removed) with goal-game rate, power-play unit, team implied total, opponent defense and goalie. Weights are starting priors, not fitted. Matchup colors: red = tough for the shooter, green = favorable. Market and goal-game chips compare a player with the rest of his own pool (top third strong/high, bottom third weak/low), so a Pick #3 depth player can be "strong" at 18%. Preseason projected defence ranking is each team's projected defensive-unit rank (1 = best) and is not used in the model. Opponent defense: ranks 1–10 red, 11–20 gray, 21–32 green. Goalie ranks use thirds of qualified goalies (20+ GP last season). * = changed teams since last season. "Projected" goalie means RotoWire lists him but the team has not confirmed.</p>
   </div>
 </div>
 <script>
@@ -130,7 +130,7 @@ function row(r){
   const any = r.any ? `${r.any.am} (${r.any.pr}%)` : 'N/A';
   const od = (r.opp_d ? `25–26 <span class="${col(r.opp_d.c)}">${r.opp_d.ga.toFixed(2)} GA/G (#${r.opp_d.rank})</span>` : '25–26 N/A')
     + ` ${sp} ` + (r.opp_c ? `26–27 <span class="${col(r.opp_c.c)}">${r.opp_c.ga.toFixed(2)} GA/G (#${r.opp_c.rank}, ${r.opp_c.gp} GP)</span>` : '26–27 N/A')
-    + ` ${sp} Preseason D <span class="${col(r.opp_pre.c)}">#${r.opp_pre.rank}${r.opp_pre.tie?' (tied)':''}</span>`;
+    + ` ${sp} Preseason projected defence ranking <span class="${col(r.opp_pre.c)}">#${r.opp_pre.rank}${r.opp_pre.tie?' (tied)':''}</span>`;
   const gb = r.goalie ? `<b>${esc(r.goalie.name)} — ${r.goalie.status}</b>
       <span class="sub2">25–26: ${gline(r.goalie.p)}</span>
       <span class="sub2">26–27: ${gline(r.goalie.c)}</span>` : 'No goalie listed yet';
