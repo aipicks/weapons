@@ -18,8 +18,10 @@ def _et(start_utc):
     return d.strftime("%I:%M %p").lstrip("0"), d
 
 
-def team_color(rank):
-    return "red" if rank <= 10 else "gray" if rank <= 20 else "green"
+def team_color(rank, n=32):
+    """Thirds-style bands: 1-10 red, 11-20 gray, 21-32 green (scaled when fewer than 32 teams are ranked)."""
+    pos = (rank - 1) / n * 32 + 1
+    return "red" if pos <= 10 else "gray" if pos <= 20 else "green"
 
 
 def third_color(rank, n):

@@ -41,6 +41,8 @@ def build_site(date):
         tm, _ = _et(r["start"])
         prev, cur, ot, gp, go = r["prev"], r["cur"], r["opp_team"], r["goalie_proj"], r["game_odds"]
         n, rk = r["pool_n"], r["rank"]
+        oc = con.execute("SELECT * FROM team_season WHERE team=? AND season=?", (r["opp"], CUR_SEASON)).fetchone()
+        n_teams = con.execute("SELECT COUNT(*) FROM team_season WHERE season=?", (CUR_SEASON,)).fetchone()[0]
         tier = "g" if rk <= n / 3 else "r" if rk > 2 * n / 3 else "m"
         game = None
         if go:
@@ -69,6 +71,8 @@ def build_site(date):
             "s26": {"gp": cur["gp"], "g": cur["g"], "sog": cur["sog"], "xg": round(r["xg_cur"]["xg"], 2) if r["xg_cur"] else None, "gg": _cur_goal_games(r["nhl_id"]) if cur["gp"] else 0}
             if cur else {"gp": 0, "g": 0, "sog": 0, "gg": 0, "xg": None},
             "opp_d": {"ga": round(ot["ga_pg"], 2), "rank": ot["ga_rank"], "c": team_color(ot["ga_rank"])} if ot else None,
+            "opp_c": {"ga": round(oc["ga_pg"], 2), "rank": oc["ga_rank"], "gp": oc["gp"], "n": n_teams,
+                      "c": team_color(oc["ga_rank"], n_teams)} if oc else None,
             "goalie": goalie, "why": [[p, t] for p, t in r["reasons_signed"]],
         })
     payload = {"date": date, "rows": out, "meta": meta, "missing": [m[0] for m in missing]}

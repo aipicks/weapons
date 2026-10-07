@@ -120,6 +120,18 @@ def ingest_goalies(con, date):
     return n, unmatched
 
 
+def update_team_stats(con, season=CUR_SEASON):
+    """Current-season team GA/G + rank (small sample early; ranked among teams that have played)."""
+    abbr = nhl_api.team_abbrevs(force=False)
+    rows = [r for r in nhl_api.teams(season, True) if r["gamesPlayed"] > 0]
+    ranks = _ranks([(r["teamFullName"], r["goalsAgainstPerGame"]) for r in rows], "ga", True)
+    for r in rows:
+        n = r["teamFullName"]
+        if n in abbr:
+            con.execute("INSERT OR REPLACE INTO team_season VALUES(?,?,?,?,?)",
+                        (abbr[n], season, r["gamesPlayed"], r["goalsAgainstPerGame"], ranks[n]))
+
+
 def update_xg(con):
     """Individual expected goals: previous season cached once, current season refreshed daily."""
     for year, season, force in ((2025, 20252026, False), (2026, 20262027, True)):
@@ -131,6 +143,7 @@ def update_daily(date):
     con = connect()
     update_current_stats(con)
     update_xg(con)
+    update_team_stats(con)
     s = ingest_slate(con, date)
     n, um = ingest_goalies(con, date)
     con.execute("INSERT OR REPLACE INTO meta VALUES('daily_updated', datetime('now'))")
