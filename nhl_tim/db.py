@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS odds_game(
 CREATE TABLE IF NOT EXISTS odds_atg(
   event_id TEXT, nhl_id INTEGER, player TEXT, team TEXT, opp TEXT, book TEXT, american REAL, implied REAL, ts TEXT,
   PRIMARY KEY(event_id, player, book));
+CREATE TABLE IF NOT EXISTS player_xg(
+  nhl_id INTEGER, season INTEGER, gp INTEGER, xg REAL, goals REAL, PRIMARY KEY(nhl_id, season));
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 """
 

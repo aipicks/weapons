@@ -100,6 +100,8 @@ def build_rows(con, date):
         opp = g["away"] if team == g["home"] else g["home"]
         prev = con.execute("SELECT * FROM player_season WHERE nhl_id=? AND season=?", (pid, PREV_SEASON)).fetchone()
         cur = con.execute("SELECT * FROM player_season WHERE nhl_id=? AND season=?", (pid, CUR_SEASON)).fetchone()
+        xgp = con.execute("SELECT gp, xg FROM player_xg WHERE nhl_id=? AND season=?", (pid, PREV_SEASON)).fetchone()
+        xgc = con.execute("SELECT gp, xg FROM player_xg WHERE nhl_id=? AND season=?", (pid, CUR_SEASON)).fetchone()
         pp = con.execute("SELECT unit FROM pp_unit WHERE nhl_id=?", (pid,)).fetchone()
         pp_unit = pp["unit"] if pp else 0
         books = atg.get((eid, pid), [])
@@ -116,6 +118,11 @@ def build_rows(con, date):
         if prev and prev["gp"]:
             pg = W["prior_games"]
             prior_pct = (prev["goal_game_pct"] * prev["gp"] + W["league_goal_game"] * pg) / (prev["gp"] + pg)
+        if xgp and xgp["gp"] >= 20:  # individual xG is less noisy than goals: blend its Poisson P(>=1)
+            pg = W["prior_games"]
+            p_xg = 1 - math.exp(-xgp["xg"] / xgp["gp"])
+            p_xg = (p_xg * xgp["gp"] + W["league_goal_game"] * pg) / (xgp["gp"] + pg)
+            prior_pct = (1 - W["xg_weight"]) * prior_pct + W["xg_weight"] * p_xg
         rate = prior_pct
         if cur and cur["gp"]:
             est = min(cur["g"], cur["gp"]) * 0.92  # goals -> approx goal-games
@@ -180,7 +187,7 @@ def build_rows(con, date):
             "game_odds": godds[eid]["row"], "xg": xg, "opp_team": opp_t,
             "goalie_proj": gp_row, "goalie": gb,
             "atg_display": fd or (books[0] if books else None), "atg_cons": cons, "atg_best": best,
-            "p_fund": p_fund, "p_mkt": p_mkt, "p": pm, "all_reasons": reasons,
+            "p_fund": p_fund, "p_mkt": p_mkt, "p": pm, "all_reasons": reasons, "xg_prev": xgp, "xg_cur": xgc,
         })
     # rank within pool
     byp = {}

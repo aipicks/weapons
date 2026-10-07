@@ -64,9 +64,10 @@ def build_site(date):
             "any": {"am": fmt_american(a["american"]), "pr": round(a["implied"] * 100, 1)} if a else None,
             "game": game, "xg": round(r["xg"], 2) if r["xg"] is not None else None,
             "s25": {"gp": prev["gp"], "sog": prev["sog"], "gg": prev["goal_games"],
+                    "xg": round(r["xg_prev"]["xg"], 1) if r["xg_prev"] else None,
                     "ggp": round(prev["goal_game_pct"] * 100, 1)} if prev else None,
-            "s26": {"gp": cur["gp"], "sog": cur["sog"], "gg": _cur_goal_games(r["nhl_id"]) if cur["gp"] else 0}
-            if cur else {"gp": 0, "sog": 0, "gg": 0},
+            "s26": {"gp": cur["gp"], "sog": cur["sog"], "xg": round(r["xg_cur"]["xg"], 2) if r["xg_cur"] else None, "gg": _cur_goal_games(r["nhl_id"]) if cur["gp"] else 0}
+            if cur else {"gp": 0, "sog": 0, "gg": 0, "xg": None},
             "opp_d": {"ga": round(ot["ga_pg"], 2), "rank": ot["ga_rank"], "c": team_color(ot["ga_rank"])} if ot else None,
             "goalie": goalie, "why": [[p, t] for p, t in r["reasons_signed"]],
         })

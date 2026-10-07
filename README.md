@@ -24,6 +24,7 @@ Copy `data/pools.csv.example` to `data/pools.csv` (`pool,player,team`), pool = 1
 ## Notes
 - Anytime goal in SGO = `points-<PLAYER>-game-yn-yes`; FanDuel shown, all books stored for consensus/best price.
 - Implied team totals: total shifted by over/under lean, split by de-vigged moneyline (`odds_math.py`).
+- Individual expected goals (xG) come from MoneyPuck (free CSV, joined by NHL id); last season cached once, current season refreshed daily.
 - Player matching: normalized name + team (+ position for same-name players).
 - Goalie colours: ranks among qualified (>=20 GP) goalies in thirds; current-season ranks include any goalie with GP>=1 (small sample, shrunk in the model).
 

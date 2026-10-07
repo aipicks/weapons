@@ -3,7 +3,7 @@ from .config import CUR_SEASON
 from .db import connect
 from .normalize import norm_name, norm_team
 from .odds_math import american_to_prob
-from .sources import nhl_api, rotowire, sgo
+from .sources import moneypuck, nhl_api, rotowire, sgo
 from .history import _ranks
 
 
@@ -120,9 +120,17 @@ def ingest_goalies(con, date):
     return n, unmatched
 
 
+def update_xg(con):
+    """Individual expected goals: previous season cached once, current season refreshed daily."""
+    for year, season, force in ((2025, 20252026, False), (2026, 20262027, True)):
+        for pid, d in moneypuck.fetch(year, force).items():
+            con.execute("INSERT OR REPLACE INTO player_xg VALUES(?,?,?,?,?)", (pid, season, d["gp"], d["xg"], d["goals"]))
+
+
 def update_daily(date):
     con = connect()
     update_current_stats(con)
+    update_xg(con)
     s = ingest_slate(con, date)
     n, um = ingest_goalies(con, date)
     con.execute("INSERT OR REPLACE INTO meta VALUES('daily_updated', datetime('now'))")

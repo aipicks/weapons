@@ -26,4 +26,5 @@ W = {
     "goalie_sv": 12.0,         # logit per 1.0 of SV% below league avg (.015 -> ~0.18)
     "goalie_gp_k": 10,         # shrink current goalie SV% toward prev season by GP/(GP+k)
     "league_sv": 0.905,
+    "xg_weight": 0.4,          # share of last-season rate taken from individual xG (Poisson P(>=1)) vs goal-game rate
 }
