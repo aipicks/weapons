@@ -28,3 +28,11 @@ W = {
     "league_sv": 0.905,
     "xg_weight": 0.4,          # share of last-season rate taken from individual xG (Poisson P(>=1)) vs goal-game rate
 }
+
+
+# Preseason projected defensive-unit ranking (1 = best), supplied by the user. Display only, NOT used in the model.
+PRESEASON_D_ORDER = ["COL", "DAL", "MIN", "CAR", "BUF", "FLA", "NYR", "OTT", "MTL", "VGK", "CBJ", "TBL", "NYI",
+                     "NJD", "PHI", "UTA", "EDM", "WSH", "BOS", "WPG", "LAK", "DET", "STL", "TOR", "NSH", "SEA",
+                     "PIT", "ANA", "CHI", "CGY", "SJS", "VAN"]
+PRESEASON_D_TIES = {"NJD", "PHI", "UTA", "CGY", "SJS"}
+PRESEASON_D = {t: i + 1 for i, t in enumerate(PRESEASON_D_ORDER)}

@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from ..config import DATA, ROOT, CUR_SEASON
+from ..config import DATA, ROOT, CUR_SEASON, PRESEASON_D, PRESEASON_D_TIES
 from ..sources import nhl_api
 from ..db import connect
 from ..model import build_rows
@@ -71,6 +71,8 @@ def build_site(date):
             "s26": {"gp": cur["gp"], "g": cur["g"], "sog": cur["sog"], "xg": round(r["xg_cur"]["xg"], 2) if r["xg_cur"] else None, "gg": _cur_goal_games(r["nhl_id"]) if cur["gp"] else 0}
             if cur else {"gp": 0, "g": 0, "sog": 0, "gg": 0, "xg": None},
             "opp_d": {"ga": round(ot["ga_pg"], 2), "rank": ot["ga_rank"], "c": team_color(ot["ga_rank"])} if ot else None,
+            "opp_pre": {"rank": PRESEASON_D[r["opp"]], "tie": r["opp"] in PRESEASON_D_TIES,
+                        "c": team_color(PRESEASON_D[r["opp"]])},
             "opp_c": {"ga": round(oc["ga_pg"], 2), "rank": oc["ga_rank"], "gp": oc["gp"], "n": n_teams,
                       "c": team_color(oc["ga_rank"], n_teams)} if oc else None,
             "goalie": goalie, "why": [[p, t] for p, t in r["reasons_signed"]],

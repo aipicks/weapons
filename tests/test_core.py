@@ -39,3 +39,9 @@ def test_ranks_direction():
 def test_color_bands():
     assert [team_color(r) for r in (1, 10, 11, 20, 21, 32)] == ["red", "red", "gray", "gray", "green", "green"]
     assert third_color(5, 66) == "red" and third_color(30, 66) == "gray" and third_color(60, 66) == "green"
+
+
+def test_preseason_defense_ranks():
+    from nhl_tim.config import PRESEASON_D, PRESEASON_D_TIES
+    assert sorted(PRESEASON_D.values()) == list(range(1, 33)) and len(PRESEASON_D) == 32
+    assert PRESEASON_D["COL"] == 1 and PRESEASON_D["VAN"] == 32 and "UTA" in PRESEASON_D_TIES
