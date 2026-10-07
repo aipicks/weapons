@@ -102,6 +102,8 @@ def build_rows(con, date):
         cur = con.execute("SELECT * FROM player_season WHERE nhl_id=? AND season=?", (pid, CUR_SEASON)).fetchone()
         xgp = con.execute("SELECT gp, xg FROM player_xg WHERE nhl_id=? AND season=?", (pid, PREV_SEASON)).fetchone()
         xgc = con.execute("SELECT gp, xg FROM player_xg WHERE nhl_id=? AND season=?", (pid, CUR_SEASON)).fetchone()
+        toi_p = con.execute("SELECT toi_pg FROM player_toi WHERE nhl_id=? AND season=?", (pid, PREV_SEASON)).fetchone()
+        toi_c = con.execute("SELECT toi_pg FROM player_toi WHERE nhl_id=? AND season=?", (pid, CUR_SEASON)).fetchone()
         pp = con.execute("SELECT unit FROM pp_unit WHERE nhl_id=?", (pid,)).fetchone()
         pp_unit = pp["unit"] if pp else 0
         books = atg.get((eid, pid), [])
@@ -188,6 +190,7 @@ def build_rows(con, date):
             "goalie_proj": gp_row, "goalie": gb,
             "atg_display": fd or (books[0] if books else None), "atg_cons": cons, "atg_best": best,
             "p_fund": p_fund, "p_mkt": p_mkt, "p": pm, "all_reasons": reasons, "xg_prev": xgp, "xg_cur": xgc,
+            "toi_prev": toi_p["toi_pg"] if toi_p else None, "toi_cur": toi_c["toi_pg"] if toi_c else None,
         })
     # rank within pool
     byp = {}

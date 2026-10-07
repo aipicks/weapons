@@ -132,6 +132,16 @@ def update_team_stats(con, season=CUR_SEASON):
                         (abbr[n], season, r["gamesPlayed"], r["goalsAgainstPerGame"], ranks[n]))
 
 
+def update_toi(con):
+    """Season-average time on ice per game (seconds): previous season cached, current refreshed daily."""
+    from .config import PREV_SEASON
+    for season, force in ((PREV_SEASON, False), (CUR_SEASON, True)):
+        for r in nhl_api.skaters(season, force):
+            if r.get("timeOnIcePerGame") is not None:
+                con.execute("INSERT OR REPLACE INTO player_toi VALUES(?,?,?)",
+                            (r["playerId"], season, r["timeOnIcePerGame"]))
+
+
 def update_xg(con):
     """Individual expected goals: previous season cached once, current season refreshed daily."""
     for year, season, force in ((2025, 20252026, False), (2026, 20262027, True)):
@@ -143,6 +153,7 @@ def update_daily(date):
     con = connect()
     update_current_stats(con)
     update_xg(con)
+    update_toi(con)
     update_team_stats(con)
     s = ingest_slate(con, date)
     n, um = ingest_goalies(con, date)

@@ -123,9 +123,9 @@ function row(r){
   const why = r.why.map(([p,t]) => `<li class="${p}">${esc(t)}</li>`).join('');
   const sp = '<span class="sep">|</span>';
   const gw = n => n === 1 ? 'Goal Game' : 'Goal Games';
-  const s25 = r.s25 ? `${r.s25.gp} GP ${sp} ${r.s25.g} G ${sp} ${r.s25.sog} SOG ${sp} ${r.s25.xg==null?'?':r.s25.xg} xG ${sp} ${r.s25.gg} ${gw(r.s25.gg)} (<b>${r.s25.ggp}%</b>)` : 'N/A';
+  const s25 = r.s25 ? `${r.s25.gp} GP ${sp} ${r.s25.g} G ${sp} ${r.s25.sog} SOG ${sp} ${r.s25.toi||'?'} TOI/G ${sp} ${r.s25.xg==null?'?':r.s25.xg} xG ${sp} ${r.s25.gg} ${gw(r.s25.gg)} (<b>${r.s25.ggp}%</b>)` : 'N/A';
   const pct26 = r.s26.gp ? ` (<b>${(r.s26.gg/r.s26.gp*100).toFixed(1)}%</b>)` : '';
-  const s26 = `${r.s26.gp} GP ${sp} ${r.s26.g} G ${sp} ${r.s26.sog} SOG ${sp} ${r.s26.xg==null?'?':r.s26.xg} xG ${sp} ${r.s26.gg==null?'?':r.s26.gg} ${gw(r.s26.gg)}${r.s26.gg==null?'':pct26}`;
+  const s26 = `${r.s26.gp} GP ${sp} ${r.s26.g} G ${sp} ${r.s26.sog} SOG ${sp} ${r.s26.toi||'?'} TOI/G ${sp} ${r.s26.xg==null?'?':r.s26.xg} xG ${sp} ${r.s26.gg==null?'?':r.s26.gg} ${gw(r.s26.gg)}${r.s26.gg==null?'':pct26}`;
   const gm = r.game ? `Total ${r.game.total} (O ${r.game.over})${r.game.fav?` // ${r.game.fav} ${r.game.ml}`:''}` : 'N/A';
   const any = r.any ? `${r.any.am} (${r.any.pr}%)` : 'N/A';
   const od = (r.opp_d ? `25–26 <span class="${col(r.opp_d.c)}">${r.opp_d.ga.toFixed(2)} GA/G (#${r.opp_d.rank})</span>` : '25–26 N/A')

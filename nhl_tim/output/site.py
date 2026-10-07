@@ -23,6 +23,10 @@ def _goalie_season(con, s):
             "svc": third_color(s["sv_rank"], n_s), "qual": bool(s["qualified"])}
 
 
+def _mmss(sec):
+    return None if sec is None else f"{int(sec // 60)}:{int(sec % 60):02d}"
+
+
 def _cur_goal_games(nhl_id):
     try:
         log = nhl_api.game_log(nhl_id, CUR_SEASON, force=True)
@@ -65,11 +69,11 @@ def build_site(date):
             "pp": r["pp_unit"],
             "any": {"am": fmt_american(a["american"]), "pr": round(a["implied"] * 100, 1)} if a else None,
             "game": game, "xg": round(r["xg"], 2) if r["xg"] is not None else None,
-            "s25": {"gp": prev["gp"], "g": prev["g"], "sog": prev["sog"], "gg": prev["goal_games"],
+            "s25": {"toi": _mmss(r["toi_prev"]), "gp": prev["gp"], "g": prev["g"], "sog": prev["sog"], "gg": prev["goal_games"],
                     "xg": round(r["xg_prev"]["xg"], 1) if r["xg_prev"] else None,
                     "ggp": round(prev["goal_game_pct"] * 100, 1)} if prev else None,
-            "s26": {"gp": cur["gp"], "g": cur["g"], "sog": cur["sog"], "xg": round(r["xg_cur"]["xg"], 2) if r["xg_cur"] else None, "gg": _cur_goal_games(r["nhl_id"]) if cur["gp"] else 0}
-            if cur else {"gp": 0, "g": 0, "sog": 0, "gg": 0, "xg": None},
+            "s26": {"toi": _mmss(r["toi_cur"]), "gp": cur["gp"], "g": cur["g"], "sog": cur["sog"], "xg": round(r["xg_cur"]["xg"], 2) if r["xg_cur"] else None, "gg": _cur_goal_games(r["nhl_id"]) if cur["gp"] else 0}
+            if cur else {"toi": None, "gp": 0, "g": 0, "sog": 0, "gg": 0, "xg": None},
             "opp_d": {"ga": round(ot["ga_pg"], 2), "rank": ot["ga_rank"], "c": team_color(ot["ga_rank"])} if ot else None,
             "opp_pre": {"rank": PRESEASON_D[r["opp"]], "tie": r["opp"] in PRESEASON_D_TIES,
                         "c": team_color(PRESEASON_D[r["opp"]])},
