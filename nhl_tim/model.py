@@ -27,6 +27,9 @@ def load_pools(con, date):
             team = (r.get("team") or "").strip().upper()
             rows = con.execute("SELECT nhl_id FROM player WHERE name_norm=?" + (" AND team=?" if team else ""),
                                (n, team) if team else (n,)).fetchall()
+            if len(rows) != 1 and team:  # nickname variants: same last name on that team
+                rows = con.execute("SELECT nhl_id FROM player WHERE team=? AND name_norm LIKE ?",
+                                   (team, "% " + n.split()[-1])).fetchall()
             if len(rows) == 1:
                 out[rows[0]["nhl_id"]] = int(r["pool"])
             else:
