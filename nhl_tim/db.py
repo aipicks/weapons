@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS odds_game(
   event_id TEXT, book TEXT, ts TEXT, total REAL, over_price REAL, under_price REAL, ml_home REAL, ml_away REAL,
   PRIMARY KEY(event_id, book));
 CREATE TABLE IF NOT EXISTS odds_atg(
-  event_id TEXT, nhl_id INTEGER, player TEXT, team TEXT, opp TEXT, book TEXT, american REAL, implied REAL, ts TEXT,
+  event_id TEXT, nhl_id INTEGER, player TEXT, team TEXT, opp TEXT, book TEXT, american REAL, implied REAL, ts TEXT, no_american REAL,
   PRIMARY KEY(event_id, player, book));
 CREATE TABLE IF NOT EXISTS player_xg(
   nhl_id INTEGER, season INTEGER, gp INTEGER, xg REAL, goals REAL, PRIMARY KEY(nhl_id, season));
@@ -42,4 +42,7 @@ def connect():
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
+    cols = [r[1] for r in con.execute('PRAGMA table_info(odds_atg)')]
+    if 'no_american' not in cols:  # migrate older databases
+        con.execute('ALTER TABLE odds_atg ADD COLUMN no_american REAL')
     return con

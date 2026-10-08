@@ -4,7 +4,7 @@ import math
 import statistics
 from .config import PREV_SEASON, CUR_SEASON, MARKET_BOOK, POOLS_CSV, W
 from .normalize import norm_name
-from .odds_math import implied_team_totals
+from .odds_math import american_to_prob, implied_team_totals
 
 
 def logit(p):
@@ -57,9 +57,23 @@ def _goalie_sv_eff(gb):
     return w * c["sv_pct"] + (1 - w) * prior
 
 
-def build_rows(con, date):
+def role_priors(con):
+    """Empirical 2025-26 goal-game rate by (position, PP tier), GP-weighted, players with 20+ GP.
+    Used as the shrinkage prior so depth players and defensemen are not pulled toward a forward-wide average."""
+    acc = {}
+    for r in con.execute("""SELECT p.pos pos, COALESCE(u.unit, 0) unit, s.goal_games gg, s.gp gp
+                            FROM player_season s JOIN player p USING(nhl_id) LEFT JOIN pp_unit u USING(nhl_id)
+                            WHERE s.season=? AND s.gp>=20""", (PREV_SEASON,)):
+        a = acc.setdefault((r["pos"], r["unit"]), [0, 0])
+        a[0] += r["gg"]; a[1] += r["gp"]
+    return {k: v[0] / v[1] for k, v in acc.items() if v[1]}
+
+
+def build_rows(con, date, all_players=False):
+    """Pool mode (pools.csv) by default; all_players=True ranks every player with anytime-goal odds together (pool 0)."""
     games = {g["event_id"]: g for g in con.execute("SELECT * FROM game WHERE date=?", (date,))}
-    pools = load_pools(con, date)
+    priors = role_priors(con)
+    pools = None if all_players else load_pools(con, date)
     pool_map, missing = (pools if pools else (None, []))
 
     # game odds: prefer MARKET_BOOK, else any book
@@ -80,6 +94,8 @@ def build_rows(con, date):
     # candidate players: pool members, else every player with anytime odds
     atg = {}
     for r in con.execute("SELECT * FROM odds_atg WHERE nhl_id IS NOT NULL"):
+        if r["event_id"] not in games:  # odds stored for other dates
+            continue
         atg.setdefault((r["event_id"], r["nhl_id"]), []).append(r)
     cands = []
     if pool_map is not None:
@@ -113,7 +129,12 @@ def build_rows(con, date):
         pp_unit = pp["unit"] if pp else 0
         books = atg.get((eid, pid), [])
         fd = next((b for b in books if b["book"] == MARKET_BOOK), None)
-        cons = statistics.median([b["implied"] for b in books]) if books else None
+        def _fair(b):  # remove the book's margin using the Yes/No pair when the No price exists
+            if b["no_american"] is not None:
+                n_ = american_to_prob(b["no_american"])
+                return b["implied"] / (b["implied"] + n_)
+            return b["implied"] * W["vig_factor"]
+        cons = statistics.median([_fair(b) for b in books]) if books else None
         best = max((b["american"] for b in books), default=None)
         xg = godds[eid]["xg"].get(team)
         gp_row = gproj.get((eid, opp))
@@ -121,14 +142,15 @@ def build_rows(con, date):
         opp_t = teams.get(opp)
 
         # --- fundamentals ---
-        prior_pct = W["league_goal_game"]
+        lg = priors.get((p["pos"], pp_unit), W["league_goal_game"])  # role-specific league average
+        prior_pct = lg
         if prev and prev["gp"]:
             pg = W["prior_games"]
-            prior_pct = (prev["goal_game_pct"] * prev["gp"] + W["league_goal_game"] * pg) / (prev["gp"] + pg)
+            prior_pct = (prev["goal_game_pct"] * prev["gp"] + lg * pg) / (prev["gp"] + pg)
         if xgp and xgp["gp"] >= 20:  # individual xG is less noisy than goals: blend its Poisson P(>=1)
             pg = W["prior_games"]
             p_xg = 1 - math.exp(-xgp["xg"] / xgp["gp"])
-            p_xg = (p_xg * xgp["gp"] + W["league_goal_game"] * pg) / (xgp["gp"] + pg)
+            p_xg = (p_xg * xgp["gp"] + lg * pg) / (xgp["gp"] + pg)
             prior_pct = (1 - W["xg_weight"]) * prior_pct + W["xg_weight"] * p_xg
         rate = prior_pct
         if cur and cur["gp"]:
@@ -148,7 +170,7 @@ def build_rows(con, date):
         p_fund = sigmoid(z_fund)
 
         if cons is not None:
-            p_mkt = cons * W["vig_factor"]
+            p_mkt = cons
             pm = sigmoid(W["market_weight"] * logit(p_mkt) + (1 - W["market_weight"]) * z_fund)
         else:
             p_mkt, pm = None, p_fund

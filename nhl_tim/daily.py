@@ -95,8 +95,10 @@ def ingest_slate(con, date, force=True):
                 if bo.get("odds") is None or not bo.get("available", True):
                     continue
                 am = float(bo["odds"])
-                con.execute("INSERT OR REPLACE INTO odds_atg VALUES(?,?,?,?,?,?,?,?,?)",
-                            (eid, pid, pinfo["name"], team, opp, b, am, american_to_prob(am), bo.get("lastUpdatedAt")))
+                no_bo = o.get(oid.replace("-yes", "-no"), {}).get("byBookmaker", {}).get(b, {})
+                no_am = float(no_bo["odds"]) if no_bo.get("odds") is not None else None
+                con.execute("INSERT OR REPLACE INTO odds_atg VALUES(?,?,?,?,?,?,?,?,?,?)",
+                            (eid, pid, pinfo["name"], team, opp, b, am, american_to_prob(am), bo.get("lastUpdatedAt"), no_am))
                 stats["atg"] += 1
     return stats
 

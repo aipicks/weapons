@@ -35,11 +35,16 @@ def _cur_goal_games(nhl_id):
         return None
 
 
-def build_site(date):
-    con = connect()
-    rows, missing = build_rows(con, date)
-    meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
-            for k in ("last_pp_update", "daily_updated")}
+_GG = {}
+
+
+def _gg(pid):
+    if pid not in _GG:
+        _GG[pid] = _cur_goal_games(pid)
+    return _GG[pid]
+
+
+def _rows(con, rows):
     out = []
     for r in rows:
         tm, _ = _et(r["start"])
@@ -56,6 +61,12 @@ def build_site(date):
                 game["fav"] = r["home"] if home_fav else r["away"]
                 game["ml"] = fmt_american(go["ml_home"] if home_fav else go["ml_away"])
         a = r["atg_display"]
+        ev = edge = None
+        if a:  # value vs the displayed (FanDuel) price: EV per $1 staked and probability edge in points
+            am = a["american"]
+            dec = 1 + (am / 100 if am > 0 else 100 / -am)
+            ev = round((r["p"] * dec - 1) * 100, 1)
+            edge = round((r["p"] - a["implied"]) * 100, 1)
         goalie = None
         if gp and gp["goalie_name"]:
             goalie = {"name": gp["goalie_name"], "status": STATUS.get(gp["status"], "Unknown"),
@@ -66,13 +77,13 @@ def build_site(date):
             "game_name": f"{r['away']} @ {r['home']}", "time": tm, "eid": r["event_id"],
             "name": r["name"], "team": r["team"], "opp": r["opp"], "pos": r["pos"], "chg": r["team_changed"],
             "p": round(r["p"] * 100, 1), "pm": round(r["p_mkt"] * 100, 1) if r["p_mkt"] else None,
-            "pp": r["pp_unit"],
+            "pp": r["pp_unit"], "ev": ev, "edge": edge,
             "any": {"am": fmt_american(a["american"]), "pr": round(a["implied"] * 100, 1)} if a else None,
             "game": game, "xg": round(r["xg"], 2) if r["xg"] is not None else None,
             "s25": {"toi": _mmss(r["toi_prev"]), "gp": prev["gp"], "g": prev["g"], "sog": prev["sog"], "gg": prev["goal_games"],
                     "xg": round(r["xg_prev"]["xg"], 1) if r["xg_prev"] else None,
                     "ggp": round(prev["goal_game_pct"] * 100, 1)} if prev else None,
-            "s26": {"toi": _mmss(r["toi_cur"]), "gp": cur["gp"], "g": cur["g"], "sog": cur["sog"], "xg": round(r["xg_cur"]["xg"], 2) if r["xg_cur"] else None, "gg": _cur_goal_games(r["nhl_id"]) if cur["gp"] else 0}
+            "s26": {"toi": _mmss(r["toi_cur"]), "gp": cur["gp"], "g": cur["g"], "sog": cur["sog"], "xg": round(r["xg_cur"]["xg"], 2) if r["xg_cur"] else None, "gg": _gg(r["nhl_id"]) if cur["gp"] else 0}
             if cur else {"toi": None, "gp": 0, "g": 0, "sog": 0, "gg": 0, "xg": None},
             "opp_d": {"ga": round(ot["ga_pg"], 2), "rank": ot["ga_rank"], "c": team_color(ot["ga_rank"])} if ot else None,
             "opp_pre": {"rank": PRESEASON_D[r["opp"]], "tie": r["opp"] in PRESEASON_D_TIES,
@@ -83,7 +94,17 @@ def build_site(date):
                     "opk_p": _mmss(r["opp_pk_toi"][PREV_SEASON]), "opk_c": _mmss(r["opp_pk_toi"][CUR_SEASON])},
             "goalie": goalie, "why": [[p, t] for p, t in r["reasons_signed"]],
         })
-    payload = {"date": date, "rows": out, "meta": meta, "missing": [m[0] for m in missing]}
+    return out
+
+
+def build_site(date):
+    con = connect()
+    rows, missing = build_rows(con, date)
+    all_rows, _ = build_rows(con, date, all_players=True)
+    meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
+            for k in ("last_pp_update", "daily_updated")}
+    payload = {"date": date, "rows": _rows(con, rows), "all": _rows(con, all_rows), "meta": meta,
+               "missing": [m[0] for m in missing]}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")
@@ -96,4 +117,4 @@ def build_site(date):
     (ROOT / "board.html").write_text(standalone, encoding="utf-8")
     (ROOT / "docs").mkdir(exist_ok=True)  # published copy (GitHub Pages serves /docs)
     (ROOT / "docs" / "index.html").write_text(standalone, encoding="utf-8")
-    return str(ROOT / "board.html"), len(out)
+    return str(ROOT / "board.html"), len(payload["rows"]) + len(payload["all"])
