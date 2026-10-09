@@ -18,8 +18,9 @@ def main():
 
     if a.cmd == "update_power_play_units":
         from .powerplay import update_power_play_units
-        n, nt, un = update_power_play_units()
-        print(f"{n} PP entries, {nt} teams, {len(un)} unmatched: {un}")
+        res = update_power_play_units()
+        n, nt, un = res[:3]
+        print(f"{n} PP entries, {nt} teams, {len(un)} unmatched: {un}" + (f", {res[3]} changes" if len(res) > 3 else ""))
         return
     if a.cmd == "update_daily":
         from .daily import update_daily

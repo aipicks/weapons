@@ -1,6 +1,6 @@
 from .db import connect
 from .normalize import norm_name, norm_team
-from .sources import dailyfaceoff
+from .sources import dailyfaceoff, nhl_api, powerplayunits
 
 def _ensure(con):
     con.executescript("""
@@ -25,7 +25,58 @@ def _match(con, team, name, pos=None):
             return rows[0]["nhl_id"]
     return None
 
+def _prefer_forward(con, team, name, pos=None):
+    """Same as _match, but when two players share a name on a team (e.g. the two Elias Petterssons) take the forward."""
+    pid = _match(con, team, name, pos)
+    if pid is None:
+        rows = con.execute("SELECT nhl_id, pos FROM player WHERE name_norm=? AND team=?", (norm_name(name), team)).fetchall()
+        f = [r for r in rows if r["pos"] == "F"]
+        pid = f[0]["nhl_id"] if len(f) == 1 else None
+    return pid
+
+
 def update_power_play_units():
+    """Primary source: powerplayunits.com (measured from NHL shift charts). Falls back to Daily Faceoff if it is down."""
+    try:
+        return update_from_ppu()
+    except Exception as e:
+        print("powerplayunits.com failed, using Daily Faceoff:", e)
+        return update_from_dailyfaceoff()
+
+
+def update_from_ppu():
+    con = connect(); _ensure(con)
+    teams = powerplayunits.fetch_all()
+    abbr = {norm_name(k): v for k, v in nhl_api.team_abbrevs(force=False).items()}
+    changed, unmatched, n = 0, [], 0
+    for t in teams:
+        ab = abbr.get(norm_name(t["title"]))
+        if not ab or len(t["first"]) < 3:  # incomplete page: keep what we have for this team
+            unmatched.append(("team", t["title"]))
+            continue
+        new = {}
+        for unit, names in ((1, t["first"]), (2, t["second"])):
+            for name in names:
+                pid = _prefer_forward(con, ab, name)
+                if pid is None:
+                    unmatched.append((ab, name))
+                elif pid not in new:  # a player listed on both units counts as PP1
+                    new[pid] = unit
+        old = {r["nhl_id"]: r["unit"] for r in con.execute("SELECT nhl_id, unit FROM pp_unit WHERE team=?", (ab,))}
+        changed += sum(1 for pid in set(new) | set(old) if new.get(pid, 0) != old.get(pid, 0))
+        con.execute("DELETE FROM pp_unit WHERE team=?", (ab,))
+        for pid, unit in new.items():
+            nm = con.execute("SELECT name FROM player WHERE nhl_id=?", (pid,)).fetchone()["name"]
+            con.execute("INSERT OR REPLACE INTO pp_unit VALUES(?,?,?,?,?)", (pid, ab, nm, unit, t["measured"]))
+            con.execute("INSERT INTO pp_history VALUES(datetime('now'),?,?,?,?)", (pid, ab, nm, unit))
+            n += 1
+    con.execute("INSERT OR REPLACE INTO meta VALUES('last_pp_update', datetime('now'))")
+    con.execute("INSERT OR REPLACE INTO meta VALUES('pp_source', 'powerplayunits.com')")
+    con.commit()
+    return n, len(teams), unmatched, changed
+
+
+def update_from_dailyfaceoff():
     con = connect(); _ensure(con)
     rows = dailyfaceoff.fetch_all()
     for r in rows: r['team'] = norm_team(r['team'])

@@ -157,6 +157,8 @@ def build_site(date):
     rows, missing = build_rows(con, date)
     all_rows, _ = build_rows(con, date, all_players=True)
     all_rows = sorted([r for r in all_rows if r["ev"] is not None and r["p"] >= MIN_P_ALL], key=lambda r: r["rank"])[:TOP_N_ALL]
+    for i_, r_ in enumerate(all_rows):  # renumber 1..N now that the list is filtered
+        r_["rank"], r_["pool_n"] = i_ + 1, len(all_rows)
     meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
             for k in ("last_pp_update", "daily_updated")}
     payload = {"date": date, "rows": _rows(con, rows), "all": _rows(con, all_rows), "meta": meta,
