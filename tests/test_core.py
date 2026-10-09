@@ -66,3 +66,12 @@ def test_game_outcome_probs():
     o, u, push = over(6.0)
     assert abs(o + u + push - 1) < 1e-6 and 0 < o < 1
     assert over(5.5)[0] > over(6.5)[0]               # higher line, lower P(over)
+
+
+def test_only_five_books_allowed():
+    from nhl_tim.config import ALLOWED_BOOKS
+    assert set(ALLOWED_BOOKS) == {"fanduel", "draftkings", "betmgm", "espnbet", "bovada"}
+    from nhl_tim.db import connect
+    con = connect()
+    for tbl in ("odds_game", "odds_atg", "odds_sog"):
+        assert not con.execute(f"SELECT 1 FROM {tbl} WHERE book NOT IN ({','.join('?' * 5)}) LIMIT 1", ALLOWED_BOOKS).fetchone()

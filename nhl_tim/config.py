@@ -67,3 +67,6 @@ GAME = {
     "market_w": 0.7,       # weight on the de-vigged market in the final probability (logit blend)
     "bet_ev": 0.03, "lean_ev": 0.01,  # EV thresholds for BET / LEAN (below LEAN = PASS)
 }
+
+# Only these five sportsbooks are ever used (stored, displayed, or priced). Everything else is dropped at ingest.
+ALLOWED_BOOKS = ("fanduel", "draftkings", "betmgm", "espnbet", "bovada")

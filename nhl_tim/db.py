@@ -1,5 +1,5 @@
 import sqlite3
-from .config import DB_PATH, DATA, RAW
+from .config import DB_PATH, DATA, RAW, ALLOWED_BOOKS
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS player(
@@ -64,4 +64,7 @@ def connect():
     for c_ in ('sa_pg', 'sa_rank'):
         if c_ not in tcols:
             con.execute(f'ALTER TABLE team_season ADD COLUMN {c_} REAL')
+    ph = ','.join('?' * len(ALLOWED_BOOKS))  # drop any odds from books we do not use
+    for tbl in ('odds_game', 'odds_atg', 'odds_sog'):
+        con.execute(f'DELETE FROM {tbl} WHERE book NOT IN ({ph})', ALLOWED_BOOKS)
     return con
