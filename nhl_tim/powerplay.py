@@ -76,6 +76,26 @@ def update_from_ppu():
     return n, len(teams), unmatched, changed
 
 
+def update_lines(con=None):
+    """Forward lines and defense pairs from Daily Faceoff -> player_line (refreshed daily; lines change often)."""
+    con = con or connect()
+    rows = dailyfaceoff.fetch_lines()
+    con.execute("DELETE FROM player_line")
+    n, unmatched = 0, []
+    for r in rows:
+        team = norm_team(r["team"])
+        pos = "D" if r["group"].startswith("d") else "F"
+        pid = _match(con, team, r["name"], pos) or _prefer_forward(con, team, r["name"], pos)
+        if pid is None:
+            unmatched.append((team, r["name"]))
+            continue
+        con.execute("INSERT OR REPLACE INTO player_line VALUES(?,?,?,?)", (pid, team, r["group"].upper(), r["name"]))
+        n += 1
+    con.execute("INSERT OR REPLACE INTO meta VALUES('lines_updated', datetime('now'))")
+    con.commit()
+    return n, unmatched
+
+
 def update_from_dailyfaceoff():
     con = connect(); _ensure(con)
     rows = dailyfaceoff.fetch_all()

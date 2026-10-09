@@ -70,6 +70,32 @@ def _rows(con, rows):
             dec = 1 + (am / 100 if am > 0 else 100 / -am)
             ev = round((r["p"] * dec - 1) * 100, 1)
             edge = round((r["p"] - a["implied"]) * 100, 1)
+        # numeric sort keys for the board's sort menu
+        lr = con.execute("SELECT grp FROM player_line WHERE nhl_id=?", (r["nhl_id"],)).fetchone()
+        line = lr["grp"] if lr else None
+        gp25, gp26 = (prev["gp"] if prev else 0), (cur["gp"] if cur else 0)
+        gg25 = prev["goal_games"] if prev else 0
+        gg26 = _gg(r["nhl_id"]) if cur and cur["gp"] else 0
+
+        def ratio(a_, b_):
+            return round(a_ / b_ * 100, 1) if b_ else None
+
+        def wavg(x, wx, y, wy):
+            if x is None and y is None:
+                return None
+            if x is None or not wx:
+                return y
+            if y is None or not wy:
+                return x
+            return (x * wx + y * wy) / (wx + wy)
+        pk_p, pk_c = r["opp_pk_toi"][PREV_SEASON], r["opp_pk_toi"][CUR_SEASON]
+        oc_gp = oc["gp"] if oc else 0
+        sk = {"ggp": ratio(gg25, gp25), "ggc": ratio(gg26 or 0, gp26) if gp26 else None,
+              "ggb": ratio(gg25 + (gg26 or 0), gp25 + gp26),
+              "toip": r["toi_prev"], "toic": r["toi_cur"], "toib": wavg(r["toi_prev"], gp25, r["toi_cur"], gp26),
+              "pkp": pk_p, "pkc": pk_c, "pkb": wavg(pk_p, 82, pk_c, oc_gp),
+              "line": {"F1": 1, "F2": 2, "F3": 3, "F4": 4, "D1": 5, "D2": 6, "D3": 7}.get(line),
+              "odds": a["implied"] if a else None}
         goalie = None
         if gp and gp["goalie_name"]:
             goalie = {"name": gp["goalie_name"], "status": STATUS.get(gp["status"], "Unknown"),
@@ -80,7 +106,7 @@ def _rows(con, rows):
             "game_name": f"{r['away']} @ {r['home']}", "time": tm, "eid": r["event_id"],
             "name": r["name"], "team": r["team"], "opp": r["opp"], "pos": r["pos"], "chg": r["team_changed"],
             "p": round(r["p"] * 100, 1), "pm": round(r["p_mkt"] * 100, 1) if r["p_mkt"] else None,
-            "pp": r["pp_unit"], "ev": ev, "edge": edge,
+            "pp": r["pp_unit"], "ev": ev, "edge": edge, "line": line, "sk": sk,
             "any": {"am": fmt_american(a["american"]), "pr": round(a["implied"] * 100, 1)} if a else None,
             "game": game, "xg": round(r["xg"], 2) if r["xg"] is not None else None,
             "s25": {"toi": _mmss(r["toi_prev"]), "gp": prev["gp"], "g": prev["g"], "sog": prev["sog"], "gg": prev["goal_games"],

@@ -29,6 +29,7 @@
   --mid:#b3c2d2; --mid-bg:#243447; --mid-bar:#6c8198; --bar-bg:#243a52; color-scheme:dark}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;padding-inline:12px;padding-block:0 40px}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 .wrap{max-width:980px;margin:0 auto}
 header{padding-block:14px 6px;display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;justify-content:space-between}
 h1{font:700 34px/1 var(--display);letter-spacing:.02em;text-transform:uppercase;margin:0}
@@ -82,7 +83,8 @@ h1 span{color:var(--accent)}
 .whyl li.z{background:var(--warn-bg);color:var(--warn)} .whyl li.p{background:var(--good-bg);color:var(--good)} .whyl li.n{background:var(--bad-bg);color:var(--bad)}
 .legend{color:var(--muted);font-size:12px;margin-top:22px;line-height:1.5}
 .key{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.views .tab{font-size:18px}
+.views{flex-wrap:wrap;overflow-x:visible}
+.views .tab{font-size:15px;padding:7px 12px}
 .filters{display:flex;gap:6px;flex-wrap:wrap}
 .filters select,.filters input{font:500 13px var(--body);background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
 .filters input{flex:1 1 130px}
@@ -112,8 +114,15 @@ h1 span{color:var(--accent)}
       <input id="f-q" type="search" placeholder="Search player" aria-label="Search player">
       <select id="f-team" aria-label="Team"></select>
       <select id="f-game" aria-label="Game"></select>
-      <select id="f-pos" aria-label="Position"><option value="">F + D</option><option value="F">Forwards</option><option value="D">Defensemen</option></select>
-      <select id="f-pp" aria-label="Power play"><option value="">Any PP</option><option value="1">PP1</option><option value="2">PP2</option><option value="0">No PP</option></select>
+      <select id="f-pos" aria-label="Position"><option value="">Forwards + defensemen</option><option value="F">Forwards</option><option value="D">Defensemen</option></select>
+      <select id="f-pp" aria-label="Power play"><option value="">Any PP unit</option><option value="1">PP1</option><option value="2">PP2</option><option value="0">No PP unit</option></select>
+      <select id="f-line" aria-label="Line"><option value="">Any line / pair</option><option value="F1">Line 1</option><option value="F2">Line 2</option><option value="F3">Line 3</option><option value="F4">Line 4</option><option value="D1">D pair 1</option><option value="D2">D pair 2</option><option value="D3">D pair 3</option></select>
+      <select id="f-sort" aria-label="Sort by"><option value="default">Sort: default order</option>
+        <option value="ggp">Goal-game % · last season</option><option value="ggc">Goal-game % · this season</option><option value="ggb">Goal-game % · combined</option>
+        <option value="toip">TOI/G · last season</option><option value="toic">TOI/G · this season</option><option value="toib">TOI/G · combined</option>
+        <option value="pkp">Opp shorthanded time · last season</option><option value="pkc">Opp shorthanded time · this season</option><option value="pkb">Opp shorthanded time · combined</option>
+        <option value="line">Line / pair</option><option value="odds">Anytime goal odds</option></select>
+      <button class="chip" id="f-dir" aria-pressed="false">High → low</button>
     </div>
     <div class="tools">
       <button class="chip" id="by" aria-pressed="false">Group by game</button>
@@ -124,7 +133,7 @@ h1 span{color:var(--accent)}
   <main id="list"></main>
   <div class="legend">
     <div class="key"><span class="tag good">Top third of pool</span><span class="tag warn">Middle third</span><span class="tag bad">Bottom third</span></div>
-    <p>The Shots on Goal tab uses player shot lines from five sportsbooks: it projects each player's shots (recent form, season rate, ice time, power play time, opponent shots allowed, game pace), converts that to P(over) and P(under) at the line, blends with the de-vigged market, and shows the side with the higher EV. The model's probability is shown as it comes out, next to the market's, so a big EV means we disagree with the market, not that the market is wrong. Opponent shots against: rank 1 = fewest allowed (red, tough for shooters). The All Players tab lists only the 30 players with the highest EV across every game on the slate, and only players the model gives at least a 15% chance to score. EV is the expected profit per $1 bet if the model probability is right: model % × payout − 1, at the FanDuel anytime-goal price shown. The model leans on the market itself and is not calibrated, so treat large EV as a lead to check, not a guarantee. On the Tim Hortons tab players are ranked by model probability within each pick pool (Tim Hortons tab) or across every player with anytime-goal odds (All Players tab). Model P(goal) blends the sportsbook anytime-goal consensus (vig removed) with goal-game rate, power-play unit, team implied total, opponent defense and goalie. Weights are starting priors, not fitted. Matchup colors: red = tough for the shooter, green = favorable. Market and goal-game chips compare a player with the rest of his own pool (top third strong/high, bottom third weak/low), so a Pick #3 depth player can be "strong" at 18%. Preseason projected defence ranking is each team's projected defensive-unit rank (1 = best) and is not used in the model. Opponent defense: ranks 1–10 red, 11–20 gray, 21–32 green. Goalie ranks use thirds of qualified goalies (20+ GP last season). * = changed teams since last season. "Projected" goalie means RotoWire lists him but the team has not confirmed.</p>
+    <p>The Shots on Goal tab uses player shot lines from five sportsbooks: it projects each player's shots (recent form, season rate, ice time, power play time, opponent shots allowed, game pace), converts that to P(over) and P(under) at the line, blends with the de-vigged market, and shows the side with the higher EV. The model's probability is shown as it comes out, next to the market's, so a big EV means we disagree with the market, not that the market is wrong. Opponent shots against: rank 1 = fewest allowed (red, tough for shooters). The +EV GOAL SCORERS tab lists only the 30 players with the highest EV across every game on the slate, and only players the model gives at least a 15% chance to score. EV is the expected profit per $1 bet if the model probability is right: model % × payout − 1, at the FanDuel anytime-goal price shown. The model leans on the market itself and is not calibrated, so treat large EV as a lead to check, not a guarantee. On the Tim Hortons tab players are ranked by model probability within each pick pool (Tim Hortons tab) or across every player with anytime-goal odds (All Players tab). Model P(goal) blends the sportsbook anytime-goal consensus (vig removed) with goal-game rate, power-play unit, team implied total, opponent defense and goalie. Weights are starting priors, not fitted. Matchup colors: red = tough for the shooter, green = favorable. Market and goal-game chips compare a player with the rest of his own pool (top third strong/high, bottom third weak/low), so a Pick #3 depth player can be "strong" at 18%. Preseason projected defence ranking is each team's projected defensive-unit rank (1 = best) and is not used in the model. Opponent defense: ranks 1–10 red, 11–20 gray, 21–32 green. Goalie ranks use thirds of qualified goalies (20+ GP last season). * = changed teams since last season. "Projected" goalie means RotoWire lists him but the team has not confirmed.</p>
   </div>
 </div>
 <script>
@@ -136,9 +145,11 @@ let view = 'tim', pool = pools[0], grouped = false, limit = 40, sortev = false, 
 try { const s = JSON.parse(localStorage.getItem('pb')||'{}'); if (pools.includes(s.pool)) pool = s.pool; grouped = !!s.grouped; if (['all','tim','sog'].includes(s.view)) view = s.view; } catch(e){}
 const save = () => { try { localStorage.setItem('pb', JSON.stringify({pool, grouped, view})); } catch(e){} };
 
+let sortKey = 'default', sortAsc = false;
+const LINE_LABEL = {F1:'Line 1',F2:'Line 2',F3:'Line 3',F4:'Line 4',D1:'Pair 1',D2:'Pair 2',D3:'Pair 3'};
 const sp0 = '<span class="sep">|</span>';
 const label = p => p ? 'Pick #'+p : 'All priced';
-const VIEWS = {tim:'Tim Hortons NHL Challenge', all:'All Players', sog:'Shots on Goal'};
+const VIEWS = {tim:'Tim Hortons NHL Challenge', all:'+EV GOAL SCORERS', sog:'Shots on Goal'};
 const col = c => c ? `c-${c}` : 'c-gray';
 const rk = (v, c) => v ? `<span class="${col(c)}">#${v}</span>` : '<span class="c-na">unranked</span>';
 const PP = {1:['PP1 ✅','good'], 2:['PP2 ✔','warn'], 0:['NO PP UNIT','bad']};
@@ -170,7 +181,7 @@ function row(r){
   return `<article class="row t-${r.tier}">
     <div class="head">
       <span class="rk">${r.rank}</span>
-      <span><span class="nm">${esc(r.name)}${r.chg?'*':''}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span></span>
+      <span><span class="nm">${esc(r.name)}${r.chg?'*':''}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span>${r.line?`<span class="tag pptag">${LINE_LABEL[r.line]}</span>`:''}</span>
         <ul class="whyl">${why}</ul></span>
       <span class="pct"><b>${r.p.toFixed(1)}%</b>${(view!=='all'||r.ev==null)?'':`<em class="ev ${r.ev>=3?'p':r.ev<=-3?'n':'z'}">EV ${r.ev>0?'+':''}${r.ev.toFixed(1)}%</em>`}<i>${r.game_name.replace(' @ ','@')} ${r.time.replace(' PM','')}</i></span>
       <span class="meter"><div style="width:${Math.min(100, r.p*2)}%"></div></span>
@@ -210,13 +221,21 @@ function sogRow(r){
       <div class="ln"><span class="lab">Lines</span><span class="v">${books}</span></div>
     </div></article>`;
 }
+function baseRows(){
+  return view === 'tim' ? D.rows.filter(r => r.pool === pool) : D.all;
+}
 function filtered(){
-  if (view === 'tim') return D.rows.filter(r => r.pool === pool);
   if (view === 'sog') return D.sog;
   const q = $('#f-q').value.trim().toLowerCase(), team = $('#f-team').value, game = $('#f-game').value,
         pos = $('#f-pos').value, pp = $('#f-pp').value;
-  return D.all.filter(r => (!q || r.name.toLowerCase().includes(q)) && (!team || r.team === team) &&
-    (!game || r.eid === game) && (!pos || r.pos === pos) && (pp === '' || String(r.pp) === pp) && (!evonly || (r.ev != null && r.ev > 0)));
+  const line = $('#f-line').value;
+  let out = baseRows().filter(r => (!q || r.name.toLowerCase().includes(q)) && (!team || r.team === team) &&
+    (!game || r.eid === game) && (!pos || r.pos === pos) && (pp === '' || String(r.pp) === pp) && (!line || r.line === line));
+  if (sortKey !== 'default') {
+    const k = sortKey, dir = sortAsc ? 1 : -1;
+    out = out.slice().sort((a,b) => { const x = a.sk[k], y = b.sk[k]; if (x==null && y==null) return a.rank-b.rank; if (x==null) return 1; if (y==null) return -1; return (x-y)*dir || a.rank-b.rank; });
+  }
+  return out;
 }
 function render(){
   const all = view !== 'tim';
@@ -227,11 +246,12 @@ function render(){
   else if (grouped) {
     const games = [...new Set(rows.slice().sort((a,b)=>a.start.localeCompare(b.start)||a.eid.localeCompare(b.eid)).map(r=>r.eid))];
     for (const g of games) {
-      const gr = rows.filter(r=>r.eid===g).sort(sortev ? ((a,b)=>(b.p-a.p)) : ((a,b)=>a.rank-b.rank));
+      const gr = rows.filter(r=>r.eid===g);
+      if (sortKey === 'default' || view === 'sog') gr.sort((a,b)=>a.rank-b.rank);
       html += `<div class="game"><span>${gr[0].game_name}</span><span>${gr[0].time} ET</span></div>` + gr.map(rf).join('');
     }
   } else {
-    const sorted = rows.slice().sort(sortev ? ((a,b)=>(b.p-a.p)) : ((a,b)=>a.rank-b.rank));
+    const sorted = (sortKey !== 'default' && view !== 'sog') ? rows : rows.slice().sort((a,b)=>a.rank-b.rank);
     const shown = all ? sorted.slice(0, limit) : sorted;
     html = shown.map(rf).join('');
     if (all && sorted.length > shown.length) html += `<button class="more" id="more">Show ${Math.min(40, sorted.length-shown.length)} more (${sorted.length-shown.length} left)</button>`;
@@ -241,24 +261,30 @@ function render(){
   $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
   $('#tabs').hidden = view !== 'tim';
   $('#tabs').innerHTML = pools.map(p => `<button class="tab" role="tab" aria-selected="${p===pool}" data-p="${p}">${label(p)}</button>`).join('');
-  $('#filters').hidden = true;
+  $('#filters').hidden = view === 'sog';
   $('#by').setAttribute('aria-pressed', grouped);
   $('#evonly').hidden = true;
+  $('#f-dir').textContent = sortAsc ? 'Low → high' : 'High → low';
+  $('#f-dir').hidden = sortKey === 'default';
   $('#evonly').setAttribute('aria-pressed', evonly);
 }
 function fillFilters(){
-  const teams = [...new Set(D.all.map(r => r.team))].sort();
+  const src = [...D.rows, ...D.all];
+  const teams = [...new Set(src.map(r => r.team))].sort();
   $('#f-team').innerHTML = '<option value="">All teams</option>' + teams.map(t => `<option>${t}</option>`).join('');
-  const games = [...new Map(D.all.slice().sort((a,b)=>a.start.localeCompare(b.start)).map(r => [r.eid, r])).values()];
+  const games = [...new Map(src.slice().sort((a,b)=>a.start.localeCompare(b.start)).map(r => [r.eid, r])).values()];
   $('#f-game').innerHTML = '<option value="">All games</option>' + games.map(g => `<option value="${g.eid}">${g.game_name} ${g.time.replace(' PM','')}</option>`).join('');
 }
 $('#views').addEventListener('click', e => { const t = e.target.closest('.tab'); if (!t) return; view = t.dataset.v; limit = 40; save(); render(); scrollTo({top:0}); });
 $('#tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (!t) return; pool = +t.dataset.p; save(); render(); scrollTo({top:0}); });
 $('#list').addEventListener('click', e => { if (e.target.id === 'more') { limit += 40; render(); } });
-for (const id of ['f-q','f-team','f-game','f-pos','f-pp']) $('#'+id).addEventListener('input', () => { limit = 40; render(); });
+$('#f-sort').addEventListener('change', () => { sortKey = $('#f-sort').value; sortAsc = sortKey === 'line'; limit = 40; render(); });
+$('#f-dir').onclick = () => { sortAsc = !sortAsc; render(); };
+for (const id of ['f-q','f-team','f-game','f-pos','f-pp','f-line']) $('#'+id).addEventListener('input', () => { limit = 40; render(); });
 $('#by').onclick = () => { grouped = !grouped; save(); render(); };
 $('#evonly').onclick = () => { evonly = !evonly; limit = 40; render(); };
 fillFilters();
+if (window.innerWidth < 700) $('#gpanel').open = false;  // keep the phone view short; tap to expand
 (function(){
   const st = s => `<span class="tag ${STC[s]||'bad'}">${s}</span>`;
   const stat = (x, tag) => x ? `${tag} ${x.gaa.toFixed(2)} GAA ${rk(x.gr, x.gc)} ${String(x.sv.toFixed(3)).replace(/^0/,'')} SV% ${rk(x.svr, x.svc)} ${x.gp} GP` : `${tag} N/A`;

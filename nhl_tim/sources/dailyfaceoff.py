@@ -53,3 +53,18 @@ def starting_goalies(date, today):
                         "status": STATUS.get(g.get(f"{side}NewsStrengthName"), "Unconfirmed"),
                         "note": (g.get(f"{side}NewsDetails") or "").strip()})
     return out
+
+
+def fetch_lines():
+    """Forward lines (f1-f4) and defense pairs (d1-d3) per team from Daily Faceoff's line combinations.
+    Returns [{team, name, group, pos}] with team = DF short code (caller normalizes)."""
+    first = _next_data(f"{BASE}/toronto-maple-leafs/line-combinations")
+    out = []
+    for t in first["sortedTeams"]:
+        pp = _next_data(f"{BASE}/{t['slug']}/line-combinations")
+        for p in pp["combinations"]["players"]:
+            if p["groupIdentifier"] in ("f1", "f2", "f3", "f4", "d1", "d2", "d3"):
+                out.append({"team": t["shortName"], "name": p["name"], "group": p["groupIdentifier"],
+                            "pos": p["positionIdentifier"]})
+        time.sleep(0.5)
+    return out

@@ -215,6 +215,14 @@ def update_xg(con):
             con.execute("INSERT OR REPLACE INTO player_xg VALUES(?,?,?,?,?)", (pid, season, d["gp"], d["xg"], d["goals"]))
 
 
+def update_lines(con):
+    from .powerplay import update_lines as _ul
+    try:
+        return _ul(con)
+    except Exception as e:  # line combinations are display-only: never block the daily run
+        print("line update failed:", e)
+
+
 def update_daily(date):
     con = connect()
     update_current_stats(con)
@@ -223,6 +231,7 @@ def update_daily(date):
     update_pp_time(con)
     update_team_stats(con)
     update_team_shots(con)
+    update_lines(con)
     s = ingest_slate(con, date)
     n, um = ingest_goalies(con, date)
     con.execute("INSERT OR REPLACE INTO meta VALUES('daily_updated', datetime('now'))")
