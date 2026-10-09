@@ -170,7 +170,7 @@ def outcome_probs(lamA, lamB, total_lines):
         o = sum(v for k, v in enumerate(pmf) if k > line)
         u = sum(v for k, v in enumerate(pmf) if k < line)
         return o, u, 1 - o - u
-    return p_a / (p_a + lose + 0.0) if False else p_a, over, {"win": win, "tie": tie, "lose": lose}
+    return p_a, over, {"win": win, "tie": tie, "lose": lose}
 
 
 def _label(ev):
