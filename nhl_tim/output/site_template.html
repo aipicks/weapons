@@ -103,7 +103,7 @@ h1 span{color:var(--accent)}
     </div>
     <div class="tools">
       <button class="chip" id="by" aria-pressed="false">Group by game</button>
-      <button class="chip" id="sortev" aria-pressed="false">Sort by EV</button>
+      <button class="chip" id="sortev" aria-pressed="false">Sort by probability</button>
       <button class="chip" id="evonly" aria-pressed="false" hidden>+EV only</button>
       <span class="sub" id="count"></span>
     </div>
@@ -111,7 +111,7 @@ h1 span{color:var(--accent)}
   <main id="list"></main>
   <div class="legend">
     <div class="key"><span class="tag good">Top third of pool</span><span class="tag warn">Middle third</span><span class="tag bad">Bottom third</span></div>
-    <p>EV is the expected profit per $1 bet if the model probability is right: model % × payout − 1, at the FanDuel anytime-goal price shown. The model leans on the market itself and is not calibrated, so treat large EV as a lead to check, not a guarantee. Ranks and percentages are within each pick pool (Tim Hortons tab) or across every player with anytime-goal odds (All Players tab). Model P(goal) blends the sportsbook anytime-goal consensus (vig removed) with goal-game rate, power-play unit, team implied total, opponent defense and goalie. Weights are starting priors, not fitted. Matchup colors: red = tough for the shooter, green = favorable. Market and goal-game chips compare a player with the rest of his own pool (top third strong/high, bottom third weak/low), so a Pick #3 depth player can be "strong" at 18%. Preseason projected defence ranking is each team's projected defensive-unit rank (1 = best) and is not used in the model. Opponent defense: ranks 1–10 red, 11–20 gray, 21–32 green. Goalie ranks use thirds of qualified goalies (20+ GP last season). * = changed teams since last season. "Projected" goalie means RotoWire lists him but the team has not confirmed.</p>
+    <p>EV is the expected profit per $1 bet if the model probability is right: model % × payout − 1, at the FanDuel anytime-goal price shown. The model leans on the market itself and is not calibrated, so treat large EV as a lead to check, not a guarantee. Players are ordered by EV, highest first (those without odds go last), and ranks are within each pick pool (Tim Hortons tab) or across every player with anytime-goal odds (All Players tab). Model P(goal) blends the sportsbook anytime-goal consensus (vig removed) with goal-game rate, power-play unit, team implied total, opponent defense and goalie. Weights are starting priors, not fitted. Matchup colors: red = tough for the shooter, green = favorable. Market and goal-game chips compare a player with the rest of his own pool (top third strong/high, bottom third weak/low), so a Pick #3 depth player can be "strong" at 18%. Preseason projected defence ranking is each team's projected defensive-unit rank (1 = best) and is not used in the model. Opponent defense: ranks 1–10 red, 11–20 gray, 21–32 green. Goalie ranks use thirds of qualified goalies (20+ GP last season). * = changed teams since last season. "Projected" goalie means RotoWire lists him but the team has not confirmed.</p>
   </div>
 </div>
 <script>
@@ -185,11 +185,11 @@ function render(){
   else if (grouped) {
     const games = [...new Set(rows.slice().sort((a,b)=>a.start.localeCompare(b.start)||a.eid.localeCompare(b.eid)).map(r=>r.eid))];
     for (const g of games) {
-      const gr = rows.filter(r=>r.eid===g).sort(sortev ? ((a,b)=>(b.ev??-999)-(a.ev??-999)) : ((a,b)=>a.rank-b.rank));
+      const gr = rows.filter(r=>r.eid===g).sort(sortev ? ((a,b)=>(b.p-a.p)) : ((a,b)=>a.rank-b.rank));
       html += `<div class="game"><span>${gr[0].game_name}</span><span>${gr[0].time} ET</span></div>` + gr.map(row).join('');
     }
   } else {
-    const sorted = rows.slice().sort(sortev ? ((a,b)=>(b.ev??-999)-(a.ev??-999)) : ((a,b)=>a.rank-b.rank));
+    const sorted = rows.slice().sort(sortev ? ((a,b)=>(b.p-a.p)) : ((a,b)=>a.rank-b.rank));
     const shown = all ? sorted.slice(0, limit) : sorted;
     html = shown.map(row).join('');
     if (all && sorted.length > shown.length) html += `<button class="more" id="more">Show ${Math.min(40, sorted.length-shown.length)} more (${sorted.length-shown.length} left)</button>`;

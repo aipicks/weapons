@@ -69,10 +69,29 @@ def role_priors(con):
     return {k: v[0] / v[1] for k, v in acc.items() if v[1]}
 
 
+def role_usage(con):
+    """Average 2025-26 TOI/G and PP TOI/G (seconds) by (position, PP tier) for players with 20+ GP."""
+    out = {}
+    q = """SELECT p.pos pos, COALESCE(u.unit, 0) unit, AVG(t.toi_pg) toi, AVG(COALESCE(pp.pp_toi_pg, 0)) ppt
+           FROM player_season s JOIN player p USING(nhl_id)
+           JOIN player_toi t ON t.nhl_id=s.nhl_id AND t.season=s.season
+           LEFT JOIN player_pp_toi pp ON pp.nhl_id=s.nhl_id AND pp.season=s.season
+           LEFT JOIN pp_unit u ON u.nhl_id=s.nhl_id
+           WHERE s.season=? AND s.gp>=20 GROUP BY p.pos, COALESCE(u.unit, 0)"""
+    for r in con.execute(q, (PREV_SEASON,)):
+        out[(r["pos"], r["unit"])] = (r["toi"], r["ppt"])
+    return out
+
+
 def build_rows(con, date, all_players=False):
     """Pool mode (pools.csv) by default; all_players=True ranks every player with anytime-goal odds together (pool 0)."""
     games = {g["event_id"]: g for g in con.execute("SELECT * FROM game WHERE date=?", (date,))}
     priors = role_priors(con)
+    usage = role_usage(con)
+    pk_prev = [r[0] for r in con.execute("SELECT pk_toi_pg FROM team_pk_toi WHERE season=?", (PREV_SEASON,))]
+    league_pk = sum(pk_prev) / len(pk_prev) if pk_prev else None
+    ga_prev = [r[0] for r in con.execute("SELECT ga_pg FROM team_season WHERE season=?", (PREV_SEASON,))]
+    league_ga = sum(ga_prev) / len(ga_prev) if ga_prev else 3.0
     pools = None if all_players else load_pools(con, date)
     pool_map, missing = (pools if pools else (None, []))
 
@@ -155,14 +174,35 @@ def build_rows(con, date, all_players=False):
         rate = prior_pct
         if cur and cur["gp"]:
             est = min(cur["g"], cur["gp"]) * 0.92  # goals -> approx goal-games
+            if xgc and xgc["gp"]:  # also use this season's xG: expected goal-games from shot quality
+                est = 0.5 * est + 0.5 * xgc["gp"] * (1 - math.exp(-xgc["xg"] / xgc["gp"]))
             rate = (prior_pct * W["cur_games_k"] + est) / (W["cur_games_k"] + cur["gp"])
         parts = {}
         z = logit(rate)
         if xg is not None:
             parts["team total"] = W["team_xg"] * (xg - 3.0)
-        parts["power play"] = {1: W["pp1"], 2: W["pp2"]}.get(pp_unit, 0.0)
+        # usage: PP minutes (scaled by how much time the opponent spends shorthanded) and TOI vs role average
+        gpc = cur["gp"] if cur else 0
+        wc = gpc / (gpc + W["role_k"])
+        def _mix(a_, b_):
+            if a_ is None and b_ is None:
+                return None
+            if b_ is None or gpc == 0:
+                return a_
+            return b_ if a_ is None else (1 - wc) * a_ + wc * b_
+        pp_sec = _mix(pp_t[PREV_SEASON], pp_t[CUR_SEASON]) or 0.0
+        toi_sec = _mix(toi_p["toi_pg"] if toi_p else None, toi_c["toi_pg"] if toi_c else None)
+        oc_ = con.execute("SELECT gp, ga_pg FROM team_season WHERE team=? AND season=?", (opp, CUR_SEASON)).fetchone()
+        wo = (oc_["gp"] / (oc_["gp"] + W["opp_k"])) if oc_ else 0.0
+        pk_sec = pk_t[PREV_SEASON] if wo == 0 or pk_t[CUR_SEASON] is None else (1 - wo) * (pk_t[PREV_SEASON] or pk_t[CUR_SEASON]) + wo * pk_t[CUR_SEASON]
+        exp_pp = pp_sec * (pk_sec / league_pk) if pk_sec and league_pk else pp_sec
+        role_toi, role_pp = usage.get((p["pos"], pp_unit), (None, 0.0))
+        parts["power play"] = W["pp_min"] * ((exp_pp - (role_pp or 0.0)) / 60)
+        if toi_sec is not None and role_toi:
+            parts["toi"] = W["toi_min"] * ((toi_sec - role_toi) / 60)
         if opp_t:
-            parts["opp GA rank"] = W["opp_ga_rank"] * (opp_t["ga_rank"] - 16.5)
+            ga_eff = opp_t["ga_pg"] if not oc_ else (1 - wo) * opp_t["ga_pg"] + wo * oc_["ga_pg"]
+            parts["opp GA"] = W["opp_ga"] * (ga_eff - league_ga)
         sv = _goalie_sv_eff(gb) if gp_row and gp_row["status"] != "Unknown" else None
         if sv is not None:
             parts["goalie"] = -W["goalie_sv"] * (sv - W["league_sv"])
@@ -190,7 +230,7 @@ def build_rows(con, date, all_players=False):
             word = "High" if d > 0.15 else "Low" if d < -0.15 else "Average"
             reasons.append((d, cls(d, 0.15), f"{word} goal-game rate ({prev['goal_game_pct']*100:.0f}%)", "gg"))
         if pp_unit:
-            reasons.append((parts["power play"] * 3, "p" if pp_unit == 1 else "z", f"PP{pp_unit} role", "pp"))
+            reasons.append((0.45 if pp_unit == 1 else 0.15, "p" if pp_unit == 1 else "z", f"PP{pp_unit} role", "pp"))
         else:
             reasons.append((-0.3, "n", "No PP unit", "pp"))
         if xg is not None:
@@ -208,6 +248,11 @@ def build_rows(con, date, all_players=False):
             reasons.append((d, cls(d, 0.1), f"{word} opposing goalie ({gp_row['goalie_name']})", "gk"))
         reasons.sort(key=lambda r: -abs(r[0]))
 
+        a_ = fd or (books[0] if books else None)
+        ev = None
+        if a_:
+            am_ = a_["american"]
+            ev = pm * (1 + (am_ / 100 if am_ > 0 else 100 / -am_)) - 1
         prev_team_changed = bool(prev and prev["team"] != team)
         out.append({
             "pool": pool, "event_id": eid, "start": g["start_utc"], "away": g["away"], "home": g["home"],
@@ -216,7 +261,7 @@ def build_rows(con, date, all_players=False):
             "game_odds": godds[eid]["row"], "xg": xg, "opp_team": opp_t,
             "goalie_proj": gp_row, "goalie": gb,
             "atg_display": fd or (books[0] if books else None), "atg_cons": cons, "atg_best": best,
-            "p_fund": p_fund, "p_mkt": p_mkt, "p": pm, "all_reasons": reasons, "xg_prev": xgp, "xg_cur": xgc, "pp_toi": pp_t, "opp_pk_toi": pk_t,
+            "ev": ev, "p_fund": p_fund, "p_mkt": p_mkt, "p": pm, "all_reasons": reasons, "xg_prev": xgp, "xg_cur": xgc, "pp_toi": pp_t, "opp_pk_toi": pk_t,
             "toi_prev": toi_p["toi_pg"] if toi_p else None, "toi_cur": toi_c["toi_pg"] if toi_c else None,
         })
     # rank within pool
@@ -224,7 +269,7 @@ def build_rows(con, date, all_players=False):
     for r in out:
         byp.setdefault(r["pool"], []).append(r)
     for rows in byp.values():
-        rows.sort(key=lambda r: -r["p"])
+        rows.sort(key=lambda r: (r["ev"] is None, -(r["ev"] if r["ev"] is not None else r["p"])))  # best EV first; no-odds players last
         for i, r in enumerate(rows):
             r["rank"] = i + 1
             r["pool_n"] = len(rows)
