@@ -171,14 +171,14 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pools = [...new Set(D.rows.map(r => r.pool))].sort();
 let view = 'tim', pool = pools[0], grouped = false, limit = 40, sortev = false, evonly = false;
-try { const s = JSON.parse(localStorage.getItem('pb')||'{}'); if (pools.includes(s.pool)) pool = s.pool; grouped = !!s.grouped; if (['all','tim','sog','games'].includes(s.view)) view = s.view; } catch(e){}
+try { const s = JSON.parse(localStorage.getItem('pb')||'{}'); if (pools.includes(s.pool)) pool = s.pool; grouped = !!s.grouped; if (['all','tim','sog','games','results'].includes(s.view)) view = s.view; } catch(e){}
 const save = () => { try { localStorage.setItem('pb', JSON.stringify({pool, grouped, view})); } catch(e){} };
 
 let sortKey = 'default', sortAsc = false;
 const LINE_LABEL = {F1:'Line 1',F2:'Line 2',F3:'Line 3',F4:'Line 4',D1:'Pair 1',D2:'Pair 2',D3:'Pair 3'};
 const sp0 = '<span class="sep">|</span>';
 const label = p => p ? 'Pick #'+p : 'All priced';
-const VIEWS = {tim:'Tim Hortons NHL Challenge', all:'+EV GOAL SCORERS', sog:'Shots on Goal', games:'Game Bets'};
+const VIEWS = {tim:'Tim Hortons NHL Challenge', all:'+EV GOAL SCORERS', sog:'Shots on Goal', games:'Game Bets', results:'Results'};
 const col = c => c ? `c-${c}` : 'c-gray';
 const rk = (v, c) => v ? `<span class="${col(c)}">#${v}</span>` : '<span class="c-na">unranked</span>';
 const PP = {1:['PP1 ✅','good'], 2:['PP2 ✔','warn'], 0:['NO PP UNIT','bad']};
@@ -299,6 +299,39 @@ function renderGames(){
   $('#count').textContent = D.games.length + ' games';
   $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
 }
+const money = v => (v>0?'+$':v<0?'-$':'$') + Math.abs(v).toFixed(2);
+const num = (v, d=3) => v==null ? '?' : v.toFixed(d);
+function renderResults(){
+  $('#list').hidden = true; $('#gamesbox').hidden = false;
+  $('#tabs').hidden = true; $('#filters').hidden = true; $('#by').hidden = true;
+  const R = D.results || {};
+  const head = `<div class="gtop"><h3>Season tracking</h3><div class="gp">Every prediction is logged before the games and settled afterwards from the NHL results. <b>${R.days_settled||0}</b> day(s) settled${R.since?' since '+R.since:''} · ${R.pending||0} predictions waiting for games to finish.</div></div>`;
+  if (!R.days_settled) { $('#gamesbox').innerHTML = head + '<div class="gtop"><div class="gp">No settled results yet. The first day appears after its games finish (run the daily update the next morning).</div></div>'; finishResults(); return; }
+  const g = R.goal, br = (a,b) => a==null||b==null ? '' : (a < b ? ' <span class="tag good">model better</span>' : ' <span class="tag bad">market better</span>');
+  const calib = g.calib.map(c => `<tr><td>${c.range}</td><td>${c.n}</td><td>${c.pred}%</td><td>${c.actual}%</td></tr>`).join('');
+  const tim = R.tim.map(t => `<tr><td>Pick #${t.pool}</td><td>${t.top_n}</td><td>${t.top_hit==null?'?':t.top_hit+'%'}</td><td>${t.top_p==null?'?':t.top_p+'%'}</td><td>${t.all_hit==null?'?':t.all_hit+'%'}</td></tr>`).join('');
+  const bet = (name, x) => `<tr><td>${name}</td><td>${x.n}</td><td>${x.wins}</td><td>${x.avg_p==null?'?':x.avg_p+'%'}</td><td>${x.avg_ev==null?'?':x.avg_ev+'%'}</td><td>${money(x.profit)}</td></tr>`;
+  $('#gamesbox').innerHTML = head + `
+  <div class="gcard"><div class="ghead"><b>Goal scorers</b></div>
+    <div class="gg2">${g.n} predictions · scored <b>${g.hit}%</b> of the time vs our average <b>${g.avg_p}%</b><br>
+    Brier score (lower is better): model <b>${num(g.brier_model)}</b> vs market <b>${num(g.brier_market)}</b>${br(g.brier_model,g.brier_market)}<br>
+    <b>+EV GOAL SCORERS list</b> (15%+, top 30 by EV each day): ${g.ev_list.n} picks · hit ${g.ev_list.hit==null?'?':g.ev_list.hit+'%'} vs predicted ${g.ev_list.avg_p==null?'?':g.ev_list.avg_p+'%'} · flat $1 profit <b>${g.ev_list.profit==null?'?':money(g.ev_list.profit)}</b></div>
+    <table class="cmp"><tr><th>Our probability</th><th>Players</th><th>Predicted</th><th>Actually scored</th></tr>${calib}</table></div>
+  <div class="gcard"><div class="ghead"><b>Tim Hortons pools</b></div>
+    <table class="cmp"><tr><th>Pool</th><th>Days</th><th>Top pick scored</th><th>Predicted</th><th>All players scored</th></tr>${tim}</table></div>
+  <div class="gcard"><div class="ghead"><b>Game bets</b></div>
+    <table class="cmp"><tr><th>Bets ($1 each)</th><th>N</th><th>Won</th><th>Avg our %</th><th>Avg EV</th><th>Profit</th></tr>
+      ${bet('Moneyline, all best', R.ml.all)}${bet('Moneyline, BET+LEAN', R.ml.bet)}${bet('Total, all best', R.total.all)}${bet('Total, BET+LEAN', R.total.bet)}${bet('Best value pick', R.best_value)}</table>
+    <div class="gg2">Home-win Brier (${R.ml_brier.n} games): raw model <b>${num(R.ml_brier.model_raw)}</b> · 50/50 blend <b>${num(R.ml_brier.blend)}</b> · market <b>${num(R.ml_brier.market)}</b></div></div>
+  <div class="gcard"><div class="ghead"><b>Shots on goal</b></div>
+    <div class="gg2">${R.sog.n} lines · best side hit ${R.sog.hit==null?'?':R.sog.hit+'%'} vs our ${R.sog.avg_p==null?'?':R.sog.avg_p+'%'} · $1 on every best side ${money(R.sog.profit_all)} · only +EV sides (${R.sog.pos_n}) ${money(R.sog.pos_profit)}</div></div>
+  <p class="how">Small samples swing wildly; judge the model after hundreds of picks, not days. The goal of this page is to show whether our probability beats the market's (lower Brier score) and whether the +EV picks actually make money.</p>`;
+  finishResults();
+}
+function finishResults(){
+  $('#count').textContent = 'results';
+  $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
+}
 function baseRows(){
   return view === 'tim' ? D.rows.filter(r => r.pool === pool) : D.all;
 }
@@ -317,6 +350,7 @@ function filtered(){
 }
 function render(){
   if (view === 'games') return renderGames();
+  if (view === 'results') return renderResults();
   $('#gamesbox').hidden = true; $('#list').hidden = false;
   const all = view !== 'tim';
   const rf = view === 'sog' ? sogRow : row;

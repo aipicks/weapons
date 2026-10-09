@@ -10,7 +10,7 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(prog="nhl_tim")
     ap.add_argument("cmd", choices=["update_history", "validate", "update_power_play_units",
-                                    "update_daily", "build_table", "build_site"])
+                                    "update_daily", "build_table", "build_site", "settle", "results"])
     ap.add_argument("--date", default=None, help="YYYY-MM-DD (ET); default today")
     ap.add_argument("--force", action="store_true", help="refetch cached history")
     a = ap.parse_args()
@@ -25,6 +25,9 @@ def main():
     if a.cmd == "update_daily":
         from .daily import update_daily
         s, n, um = update_daily(date)
+        from .db import connect as _c
+        from .tracking import settle as _settle
+        print('settled', _settle(_c()), 'earlier predictions')
         print(f"{date}: games={s['games']} atg_rows={s['atg']} atg_unmatched={len(s['atg_unmatched'])} goalie_rows={n}")
         print("atg unmatched:", sorted(set(s["atg_unmatched"]))[:40])
         print("goalie unmatched:", um)
@@ -32,6 +35,20 @@ def main():
     if a.cmd == "build_site":
         from .output.site import build_site
         print("%s (%d rows)" % build_site(date))
+        from .db import connect as _c
+        from .tracking import snapshot as _snap
+        print("logged", _snap(_c(), date), "predictions for", date)
+        return
+    if a.cmd == "settle":
+        from .db import connect as _c
+        from .tracking import settle as _settle
+        print("settled", _settle(_c()))
+        return
+    if a.cmd == "results":
+        import json
+        from .db import connect as _c
+        from .tracking import results as _res
+        print(json.dumps(_res(_c()), indent=1))
         return
     if a.cmd == "build_table":
         from .output.table import build_table

@@ -45,6 +45,10 @@ CREATE TABLE IF NOT EXISTS team_mp(
   PRIMARY KEY(team, season, sit));
 CREATE TABLE IF NOT EXISTS goalie_xg(
   nhl_id INTEGER, season INTEGER, gp INTEGER, xg REAL, goals REAL, shots REAL, PRIMARY KEY(nhl_id, season));
+CREATE TABLE IF NOT EXISTS pred_log(
+  date TEXT, kind TEXT, key TEXT, start TEXT, pool INTEGER, name TEXT, team TEXT, opp TEXT, game TEXT, side TEXT, line REAL,
+  price REAL, book TEXT, p REAL, p_mkt REAL, p_model REAL, ev REAL, label TEXT, extra TEXT,
+  outcome REAL, actual REAL, settled INTEGER DEFAULT 0, PRIMARY KEY(date, kind, key));
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 """
 
@@ -67,4 +71,5 @@ def connect():
     ph = ','.join('?' * len(ALLOWED_BOOKS))  # drop any odds from books we do not use
     for tbl in ('odds_game', 'odds_atg', 'odds_sog'):
         con.execute(f'DELETE FROM {tbl} WHERE book NOT IN ({ph})', ALLOWED_BOOKS)
+    con.commit()  # do not leave a write transaction open: other connections would hit 'database is locked'
     return con

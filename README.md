@@ -62,3 +62,9 @@ shorthanded minutes), the opposing starting goalie (goals vs expected, shrunk, d
 back-to-backs. Goals are Poisson, giving P(win) with overtime and P(over/under) at each book's line. The final probability is a
 logit blend of 70% de-vigged market and 30% model; EV is taken at the best price across books. BET = EV +3%+, LEAN = +1%+, else PASS.
 All weights live in `config.GAME`; they are starting priors, not fitted.
+
+## Results tracking
+`build_site` logs every prediction (goal scorers, shots lines, moneylines, totals, best-value pick) to `pred_log` before games start;
+`update_daily` settles earlier days from the NHL boxscores. `python -m nhl_tim.cli results` prints the summary and the Results tab shows it:
+hit rate vs predicted probability, Brier score for model vs market, calibration buckets and flat-stake profit. Back up `data/nhl.db`
+(it holds the whole season's log and is not in git).

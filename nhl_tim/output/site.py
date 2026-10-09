@@ -8,6 +8,7 @@ from ..db import connect
 from ..model import build_rows
 from ..sog import build_sog_rows
 from ..games import build_game_rows, best_value_pick
+from ..tracking import results as _results
 from ..odds_math import fmt_american
 from .table import _et, team_color, third_color
 
@@ -241,7 +242,7 @@ def build_site(date):
     meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
             for k in ("last_pp_update", "daily_updated")}
     payload = {"date": date, "rows": _rows(con, rows), "all": _rows(con, all_rows), "meta": meta,
-               "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date), "sog": _sog_payload(con, date), "games": _games_payload(con, date), "safe": _safest_payload(con, date)}
+               "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date), "sog": _sog_payload(con, date), "games": _games_payload(con, date), "safe": _safest_payload(con, date), "results": _results(con)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")
