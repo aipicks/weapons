@@ -269,7 +269,10 @@ def build_rows(con, date, all_players=False):
     for r in out:
         byp.setdefault(r["pool"], []).append(r)
     for rows in byp.values():
-        rows.sort(key=lambda r: (r["ev"] is None, -(r["ev"] if r["ev"] is not None else r["p"])))  # best EV first; no-odds players last
+        if all_players:  # All Players: best EV first, no-odds players last
+            rows.sort(key=lambda r: (r["ev"] is None, -(r["ev"] if r["ev"] is not None else r["p"])))
+        else:  # Tim Hortons pools: highest probability first
+            rows.sort(key=lambda r: -r["p"])
         for i, r in enumerate(rows):
             r["rank"] = i + 1
             r["pool_n"] = len(rows)
