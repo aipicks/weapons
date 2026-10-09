@@ -24,7 +24,18 @@ def get(url, cache_key, force=False):
             pass
     f.parent.mkdir(parents=True, exist_ok=True)
     for attempt in range(6):
-        r = requests.get(url, timeout=30)
+        try:
+            r = requests.get(url, timeout=30)
+        except requests.RequestException:  # timeout / connection reset: retry, then fall back to saved data
+            time.sleep(2 * (attempt + 1))
+            if attempt == 5:
+                if f.exists():
+                    try:
+                        return json.loads(_read(f))
+                    except ValueError:
+                        pass
+                raise
+            continue
         if r.status_code == 404:  # e.g. no playoff log for that season: cache the miss
             f.write_text("null", encoding="utf-8")
             return None
