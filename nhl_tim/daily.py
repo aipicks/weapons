@@ -104,7 +104,7 @@ def ingest_slate(con, date, force=True):
 
 
 def ingest_goalies(con, date):
-    """Daily Faceoff is the source of truth; RotoWire only fills games Daily Faceoff doesn't list (is_fallback=1)."""
+    """Daily Faceoff is the only goalie source (by request). A game it does not list shows no goalie."""
     import datetime as dt
     import zoneinfo
     from .sources import dailyfaceoff
@@ -133,17 +133,8 @@ def ingest_goalies(con, date):
             eid = by_pair.get(frozenset((t, o))) if t and o else None
             if eid:
                 put(eid, t, o, r["goalie"], r["status"], 0, "Daily Faceoff", r["note"])
-    except Exception as e:  # Daily Faceoff down or changed: fall back entirely
+    except Exception as e:  # Daily Faceoff down or changed: the board shows no goalies rather than another source
         print("Daily Faceoff goalies failed:", e)
-    try:
-        for r in rotowire.fetch(date):
-            t, o = norm_team(r["team"]), norm_team(r["opp"])
-            eid = by_pair.get(frozenset((t, o)))
-            if eid and (eid, t) not in seen and r["goalie"]:
-                st = {"Confirmed": "Confirmed", "Expected": "Likely"}.get(r["status"], "Unconfirmed")
-                put(eid, t, o, r["goalie"], st, 1, "RotoWire (fallback)", "")
-    except Exception as e:
-        print("RotoWire fallback failed:", e)
     return n, unmatched
 
 

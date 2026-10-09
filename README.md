@@ -13,7 +13,7 @@ echo SGO_API_KEY=... > .env
 |---|---|---|
 | `update_history` | once / on demand (`--force` refetch) | 2025-26 full-season skater/goalie/team stats + games-with-a-goal (NHL API, cached in data/raw) |
 | `update_power_play_units` | manual, every few weeks | Daily Faceoff PP1/PP2 for all 32 teams -> local DB, `last_pp_update`, history kept |
-| `update_daily` | every day | current-season stats (NHL API), games/odds/anytime-goal (SportsGameOdds, 1 slate call), projected goalies (RotoWire) |
+| `update_daily` | every day | current-season stats (NHL API), games/odds/anytime-goal (SportsGameOdds, 1 slate call), projected goalies (Daily Faceoff only) |
 | `build_table` | every day | writes `data/table_<date>.html` + `.csv` |
 | `build_site` | every day, after `update_daily` | writes `data/site_<date>.html`, a mobile dashboard (single file, data embedded) |
 | `validate` | any time | checks full-season history |
