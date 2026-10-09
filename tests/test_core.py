@@ -45,3 +45,13 @@ def test_preseason_defense_ranks():
     from nhl_tim.config import PRESEASON_D, PRESEASON_D_TIES
     assert sorted(PRESEASON_D.values()) == list(range(1, 33)) and len(PRESEASON_D) == 32
     assert PRESEASON_D["COL"] == 1 and PRESEASON_D["VAN"] == 32 and "UTA" in PRESEASON_D_TIES
+
+
+def test_update_daily_steps_exist():
+    """Guards against deleting an updater that update_daily calls (happened once)."""
+    import inspect
+    from nhl_tim import daily
+    src = inspect.getsource(daily.update_daily)
+    import re
+    for name in re.findall(r"\b(update_\w+|ingest_\w+)\(", src):
+        assert callable(getattr(daily, name, None)), name

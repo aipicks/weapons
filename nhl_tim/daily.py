@@ -80,6 +80,24 @@ def ingest_slate(con, date, force=True):
                          float(g(un)) if g(un) else None, float(g(mh)) if g(mh) else None,
                          float(g(ma)) if g(ma) else None))
         con.execute("DELETE FROM odds_atg WHERE event_id=?", (eid,))
+        con.execute("DELETE FROM odds_sog WHERE event_id=?", (eid,))
+        for oid, x in o.items():  # player shots-on-goal over/under lines
+            if not (oid.startswith("shots_onGoal-") and oid.endswith("-game-ou-over")):
+                continue
+            under = o.get(oid.replace("-over", "-under"), {}).get("byBookmaker", {})
+            pinfo = e.get("players", {}).get(x.get("playerID"))
+            tid_ = {e["teams"]["home"]["teamID"]: (h, a), e["teams"]["away"]["teamID"]: (a, h)}
+            if not pinfo or pinfo.get("teamID") not in tid_:
+                continue
+            team_, opp_ = tid_[pinfo["teamID"]]
+            pid_ = _find_player(con, team_, pinfo["name"])
+            for b, bo in x.get("byBookmaker", {}).items():
+                ub = under.get(b, {})
+                if bo.get("odds") is None or bo.get("overUnder") is None or ub.get("odds") is None:
+                    continue
+                con.execute("INSERT OR REPLACE INTO odds_sog VALUES(?,?,?,?,?,?,?,?,?,?)",
+                            (eid, pid_, pinfo["name"], team_, opp_, b, float(bo["overUnder"]),
+                             float(bo["odds"]), float(ub["odds"]), bo.get("lastUpdatedAt")))
         tid = {e["teams"]["home"]["teamID"]: (h, a), e["teams"]["away"]["teamID"]: (a, h)}
         for oid, x in o.items():
             if not (oid.startswith("points-") and oid.endswith("-game-yn-yes")):
@@ -138,6 +156,65 @@ def ingest_goalies(con, date):
     return n, unmatched
 
 
+def update_team_stats(con, season=CUR_SEASON):
+    """Current-season team GA/G + rank (small sample early; ranked among teams that have played)."""
+    abbr = nhl_api.team_abbrevs(force=False)
+    rows = [r for r in nhl_api.teams(season, True) if r["gamesPlayed"] > 0]
+    ranks = _ranks([(r["teamFullName"], r["goalsAgainstPerGame"]) for r in rows], "ga", True)
+    for r in rows:
+        n = r["teamFullName"]
+        if n in abbr:
+            con.execute("INSERT OR REPLACE INTO team_season VALUES(?,?,?,?,?)",
+                        (abbr[n], season, r["gamesPlayed"], r["goalsAgainstPerGame"], ranks[n]))
+
+
+def update_toi(con):
+    """Season-average time on ice per game (seconds): previous season cached, current refreshed daily."""
+    from .config import PREV_SEASON
+    for season, force in ((PREV_SEASON, False), (CUR_SEASON, True)):
+        for r in nhl_api.skaters(season, force):
+            if r.get("timeOnIcePerGame") is not None:
+                con.execute("INSERT OR REPLACE INTO player_toi VALUES(?,?,?)",
+                            (r["playerId"], season, r["timeOnIcePerGame"]))
+
+
+def update_team_shots(con):
+    """Shots against per game (and rank, 1 = fewest) for last season and this season."""
+    from .config import PREV_SEASON
+    abbr = nhl_api.team_abbrevs(force=False)
+    for season, force in ((PREV_SEASON, False), (CUR_SEASON, True)):
+        rows = [r for r in nhl_api.teams(season, force) if r["gamesPlayed"] > 0 and r.get("shotsAgainstPerGame") is not None]
+        ranks = _ranks([(r["teamFullName"], r["shotsAgainstPerGame"]) for r in rows], "sa", True)
+        for r in rows:
+            n = r["teamFullName"]
+            if n in abbr:
+                con.execute("UPDATE team_season SET sa_pg=?, sa_rank=? WHERE team=? AND season=?",
+                            (r["shotsAgainstPerGame"], ranks[n], abbr[n], season))
+
+
+def update_pp_time(con):
+    """Player PP time on ice per game, and each team's time shorthanded (penalty kill) per game, in seconds.
+    Previous season cached once; current season refreshed daily."""
+    from .config import PREV_SEASON
+    abbr = nhl_api.team_abbrevs(force=False)
+    for season, force in ((PREV_SEASON, False), (CUR_SEASON, True)):
+        for r in nhl_api.skater_powerplay(season, force):
+            if r.get("ppTimeOnIcePerGame") is not None:
+                con.execute("INSERT OR REPLACE INTO player_pp_toi VALUES(?,?,?)",
+                            (r["playerId"], season, r["ppTimeOnIcePerGame"]))
+        for r in nhl_api.team_penaltykill(season, force):
+            n = r["teamFullName"]
+            if n in abbr and r.get("pkTimeOnIcePerGame") is not None and r["gamesPlayed"] > 0:
+                con.execute("INSERT OR REPLACE INTO team_pk_toi VALUES(?,?,?)", (abbr[n], season, r["pkTimeOnIcePerGame"]))
+
+
+def update_xg(con):
+    """Individual expected goals: previous season cached once, current season refreshed daily."""
+    for year, season, force in ((2025, 20252026, False), (2026, 20262027, True)):
+        for pid, d in moneypuck.fetch(year, force).items():
+            con.execute("INSERT OR REPLACE INTO player_xg VALUES(?,?,?,?,?)", (pid, season, d["gp"], d["xg"], d["goals"]))
+
+
 def update_daily(date):
     con = connect()
     update_current_stats(con)
@@ -145,6 +222,7 @@ def update_daily(date):
     update_toi(con)
     update_pp_time(con)
     update_team_stats(con)
+    update_team_shots(con)
     s = ingest_slate(con, date)
     n, um = ingest_goalies(con, date)
     con.execute("INSERT OR REPLACE INTO meta VALUES('daily_updated', datetime('now'))")

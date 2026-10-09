@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS player_pp_toi(
   nhl_id INTEGER, season INTEGER, pp_toi_pg REAL, PRIMARY KEY(nhl_id, season));
 CREATE TABLE IF NOT EXISTS team_pk_toi(
   team TEXT, season INTEGER, pk_toi_pg REAL, PRIMARY KEY(team, season));
+CREATE TABLE IF NOT EXISTS odds_sog(
+  event_id TEXT, nhl_id INTEGER, player TEXT, team TEXT, opp TEXT, book TEXT, line REAL,
+  over_price REAL, under_price REAL, ts TEXT, PRIMARY KEY(event_id, player, book));
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 """
 
@@ -50,4 +53,8 @@ def connect():
     for c_ in ('source', 'note'):
         if c_ not in gcols:
             con.execute(f'ALTER TABLE goalie_proj ADD COLUMN {c_} TEXT')
+    tcols = [r[1] for r in con.execute('PRAGMA table_info(team_season)')]
+    for c_ in ('sa_pg', 'sa_rank'):
+        if c_ not in tcols:
+            con.execute(f'ALTER TABLE team_season ADD COLUMN {c_} REAL')
     return con
