@@ -80,6 +80,13 @@ def role_usage(con):
            WHERE s.season=? AND s.gp>=20 GROUP BY p.pos, COALESCE(u.unit, 0)"""
     for r in con.execute(q, (PREV_SEASON,)):
         out[(r["pos"], r["unit"])] = (r["toi"], r["ppt"])
+    # position-wide averages (TOI seconds, shots per game) for the usage / volume adjustments
+    qp = """SELECT p.pos pos, AVG(t.toi_pg) toi, SUM(s.sog) * 1.0 / SUM(s.gp) sog
+            FROM player_season s JOIN player p USING(nhl_id)
+            JOIN player_toi t ON t.nhl_id=s.nhl_id AND t.season=s.season
+            WHERE s.season=? AND s.gp>=20 GROUP BY p.pos"""
+    for r in con.execute(qp, (PREV_SEASON,)):
+        out[("pos", r["pos"])] = (r["toi"], r["sog"])
     return out
 
 
@@ -197,9 +204,15 @@ def build_rows(con, date, all_players=False):
         pk_sec = pk_t[PREV_SEASON] if wo == 0 or pk_t[CUR_SEASON] is None else (1 - wo) * (pk_t[PREV_SEASON] or pk_t[CUR_SEASON]) + wo * pk_t[CUR_SEASON]
         exp_pp = pp_sec * (pk_sec / league_pk) if pk_sec and league_pk else pp_sec
         role_toi, role_pp = usage.get((p["pos"], pp_unit), (None, 0.0))
-        parts["power play"] = W["pp_min"] * ((exp_pp - (role_pp or 0.0)) / 60)
-        if toi_sec is not None and role_toi:
-            parts["toi"] = W["toi_min"] * ((toi_sec - role_toi) / 60)
+        parts["power play"] = W["pp_min"] * ((exp_pp - (role_pp or 0.0)) / 60) + {1: W["pp1"], 2: W["pp2"]}.get(pp_unit, 0.0)
+        pos_toi, pos_sog = usage.get(("pos", p["pos"]), (None, None))
+        if toi_sec is not None and pos_toi:  # ice time vs the position average
+            parts["toi"] = W["toi_min"] * ((toi_sec - pos_toi) / 60)
+        sog_p = (prev["sog"] / prev["gp"]) if prev and prev["gp"] >= 20 else None
+        sog_c = (cur["sog"] / cur["gp"]) if cur and cur["gp"] else None
+        sog_eff = sog_p if sog_c is None else sog_c if sog_p is None else (1 - wc) * sog_p + wc * sog_c
+        if sog_eff is not None and pos_sog:  # shot volume vs the position average
+            parts["shots"] = W["sog_per"] * (sog_eff - pos_sog)
         if opp_t:
             ga_eff = opp_t["ga_pg"] if not oc_ else (1 - wo) * opp_t["ga_pg"] + wo * oc_["ga_pg"]
             parts["opp GA"] = W["opp_ga"] * (ga_eff - league_ga)
@@ -233,6 +246,12 @@ def build_rows(con, date, all_players=False):
             reasons.append((0.45 if pp_unit == 1 else 0.15, "p" if pp_unit == 1 else "z", f"PP{pp_unit} role", "pp"))
         else:
             reasons.append((-0.3, "n", "No PP unit", "pp"))
+        if "toi" in parts and abs(parts["toi"]) > 0.1:
+            reasons.append((parts["toi"] * 2, "p" if parts["toi"] > 0 else "n",
+                            f"{'Heavy' if parts['toi'] > 0 else 'Light'} ice time ({toi_sec/60:.1f} min/G)", "toi"))
+        if "shots" in parts and abs(parts["shots"]) > 0.1:
+            reasons.append((parts["shots"] * 2, "p" if parts["shots"] > 0 else "n",
+                            f"{'High' if parts['shots'] > 0 else 'Low'} shot volume ({sog_eff:.1f}/G)", "shots"))
         if xg is not None:
             d = parts["team total"] * 2
             word = "High" if d > 0.12 else "Low" if d < -0.12 else "Average"

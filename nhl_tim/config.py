@@ -21,15 +21,17 @@ W = {
     "prior_games": 25,         # shrink prev-season goal-game rate toward league
     "cur_games_k": 30,         # games of weight on prev-season rate when blending current season
     "team_xg": 0.10,           # per goal of team implied total above 3.0
-    "pp_min": 0.10,            # logit per expected PP minute above the role average (PP time x opponent PK time)
-    "toi_min": 0.03,           # logit per minute of TOI/G above the role average
+    "pp_min": 0.15,            # logit per expected PP minute above the role average (PP time x opponent PK time)
+    "pp1": 0.15, "pp2": 0.03,  # flat role bonus: PP1 counts for a lot more than PP2
+    "toi_min": 0.05,           # logit per minute of TOI/G above the position average
+    "sog_per": 0.12,           # logit per shot/game above the position average
     "opp_ga": 0.35,            # logit per goal of opponent GA/G above league average (25-26 blended with 26-27)
     "opp_k": 15,               # opponent games of weight on last season before the current season takes over
     "role_k": 10,              # games before current-season usage (TOI, PP time) outweighs last season
     "goalie_sv": 12.0,         # logit per 1.0 of SV% below league avg (.015 -> ~0.18)
     "goalie_gp_k": 10,         # shrink current goalie SV% toward prev season by GP/(GP+k)
     "league_sv": 0.898,
-    "xg_weight": 0.4,          # share of last-season rate taken from individual xG (Poisson P(>=1)) vs goal-game rate
+    "xg_weight": 0.6,          # share of last-season rate taken from individual xG (Poisson P(>=1)) vs goal-game rate
 }
 
 
