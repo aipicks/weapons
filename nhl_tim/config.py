@@ -15,7 +15,7 @@ POOLS_CSV = DATA / "pools.csv"  # columns: pool,player[,team]  (pool = 1|2|3)
 
 # Transparent baseline priors (NOT fitted). Replace via backtest/logistic regression later.
 W = {
-    "market_weight": 0.70,     # logit-blend weight on market (vig-adjusted consensus) when available
+    "market_weight": 0.50,     # logit-blend weight on market (vig-adjusted consensus) when available; 0.5 = model and market equal
     "vig_factor": 0.94,        # fallback vig strip when a book has no No-side price (otherwise Yes/No devig)
     "league_goal_game": 0.21,  # per-skater-game scoring rate prior
     "prior_games": 25,         # shrink prev-season goal-game rate toward league
@@ -53,7 +53,7 @@ SOG = {
     "pace_exp": 0.25,     # exponent on team implied goal total vs 3.0
     "pp_scale": 0.35,     # extra shots for PP players when the opponent takes many penalties
     "nb_r": 8.0,          # negative binomial dispersion (variance = mu + mu^2 / r)
-    "market_weight": 0.6, # logit blend weight on the de-vigged market vs the model
+    "market_weight": 0.5, # logit blend weight on the de-vigged market vs the model; 0.5 = model and market equal
 }
 
 # Game (moneyline / total) model priors (starting values, not fitted)
@@ -64,7 +64,7 @@ GAME = {
     "b2b_off": 0.97, "b2b_def": 1.03,  # second night of a back-to-back: fewer goals for, more against
     "ot_skill": 0.5,       # how much better teams win overtime/shootout (0 = coin flip, 1 = proportional to goal share)
     "ot_goal": 0.55,       # chance a tied game ends on an overtime goal (adds one goal to the total)
-    "market_w": 0.7,       # weight on the de-vigged market in the final probability (logit blend)
+    "market_w": 0.5,       # weight on the de-vigged market in the final probability (logit blend); 0.5 = model and market equal
     "bet_ev": 0.03, "lean_ev": 0.01,  # EV thresholds for BET / LEAN (below LEAN = PASS)
 }
 
