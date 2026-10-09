@@ -114,6 +114,8 @@ h1 span{color:var(--accent)}
 .gtop{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:10px}
 .gtop h3{margin:0 0 6px;font:600 16px var(--display);letter-spacing:.05em;text-transform:uppercase}
 .gp{padding:3px 0;font-size:13px}
+.gtop.safe{border-color:var(--good)}
+.hint{color:var(--muted);font-size:11px}
 .how{margin-top:14px;font-size:12.5px;line-height:1.55;color:var(--muted)}
 .how summary{cursor:pointer;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase}
 .more{display:block;width:100%;margin-top:10px;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 15px var(--display);letter-spacing:.04em;text-transform:uppercase;cursor:pointer}
@@ -291,7 +293,8 @@ function renderGames(){
   const top = picks.length
     ? `<div class="gtop"><h3>Best bets today</h3>${picks.map(p=>`<div class="gp"><span class="tag ${lab(p.l)}">${p.l}</span> <b>${p.g.away} @ ${p.g.home}</b> ${p.mk}: ${p.b.team?esc(p.b.team)+' ML':p.b.side+' '+p.b.line} ${p.b.price} <small>${BOOKSHORT(p.b.book)}</small> <span class="sep">|</span> EV <b>${evs(p.b.ev)}</b></div>`).join('')}</div>`
     : '<div class="gtop"><h3>Best bets today</h3><div class="gp">No game clears the +1% EV bar today.</div></div>';
-  $('#gamesbox').innerHTML = top + D.games.map(gcard).join('') + document.getElementById('howgames').innerHTML;
+  const sf = D.safe ? `<div class="gtop safe"><h3>${picks.length ? 'Safest pick' : 'No +EV bet today: safest pick'}</h3><div class="gp"><b>${esc(D.safe.game)}</b> ${D.safe.market}: <b>${esc(D.safe.sel)} ${D.safe.price}</b> <small>${BOOKSHORT(D.safe.book)}</small><br>our <b>${D.safe.p}%</b> to win vs market ${D.safe.mkt}% <span class="sep">|</span> EV ${evs(D.safe.ev)}</div><small class="hint">Most likely winner among every moneyline and total at -142 or better. Likely is not the same as good value.</small></div>` : '<div class="gtop safe"><h3>Safest pick</h3><div class="gp">Nothing pays -142 or better today.</div></div>';
+  $('#gamesbox').innerHTML = top + sf + D.games.map(gcard).join('') + document.getElementById('howgames').innerHTML;
   $('#count').textContent = D.games.length + ' games';
   $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
 }

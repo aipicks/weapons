@@ -177,6 +177,24 @@ def _label(ev):
     return "BET" if ev >= GAME["bet_ev"] else "LEAN" if ev >= GAME["lean_ev"] else "PASS"
 
 
+def safest_pick(rows):
+    """The single most likely winning selection (moneyline side or total side, any of the five books) that pays -142 or better.
+    Used when no game offers a +EV bet. Ranked by our final win probability."""
+    floor = GAME["safe_min_price"]
+    cands = []
+    for g in rows:
+        if g["ml"]:
+            for c in g["ml"]["cands"]:
+                cands.append({**c, "game": f"{g['away']} @ {g['home']}", "eid": g["eid"], "market_name": "Moneyline", "label_sel": f"{c['team']} ML"})
+        if g["total"]:
+            for c in g["total"]["_all"]:
+                cands.append({**c, "game": f"{g['away']} @ {g['home']}", "eid": g["eid"], "market_name": "Total", "label_sel": f"{c['side']} {c['line']:g}"})
+    ok = [c for c in cands if c["price"] >= floor]
+    if not ok:
+        return None
+    return max(ok, key=lambda c: (c["p"], c["ev"]))
+
+
 def build_game_rows(con, date):
     games = con.execute("SELECT * FROM game WHERE date=? ORDER BY start_utc, event_id", (date,)).fetchall()
     tm = load_team_mp(con)
@@ -244,7 +262,7 @@ def build_game_rows(con, date):
             best = max(cands, key=lambda c: c["ev"])
             ref_t = ref if ref and ref["total"] is not None else t_rows[0]
             o_ref, u_ref, _ = over_fn(ref_t["total"])
-            tot = {"line": ref_t["total"], "over_price": ref_t["over_price"], "under_price": ref_t["under_price"],
+            tot = {"_all": cands, "line": ref_t["total"], "over_price": ref_t["over_price"], "under_price": ref_t["under_price"],
                    "model_over": o_ref / (o_ref + u_ref), "model_total": lamH + lamA, "best": best, "label": _label(best["ev"]),
                    "fair_over": _fair2(ref_t["over_price"], ref_t["under_price"])}
 
