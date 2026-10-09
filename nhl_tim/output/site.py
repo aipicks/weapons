@@ -12,6 +12,7 @@ from .table import _et, team_color, third_color
 
 TEMPLATE = (Path(__file__).parent / "site_template.html").read_text(encoding="utf-8")
 TOP_N_ALL = 30  # All Players tab shows the top N players by EV
+MIN_P_ALL = 0.15  # ...and only players whose model probability is at least this
 STATUS = {"Confirmed": "Confirmed", "Likely": "Likely", "Unconfirmed": "Unconfirmed"}
 
 
@@ -155,7 +156,7 @@ def build_site(date):
     con = connect()
     rows, missing = build_rows(con, date)
     all_rows, _ = build_rows(con, date, all_players=True)
-    all_rows = sorted([r for r in all_rows if r["ev"] is not None], key=lambda r: r["rank"])[:TOP_N_ALL]  # top EV only
+    all_rows = sorted([r for r in all_rows if r["ev"] is not None and r["p"] >= MIN_P_ALL], key=lambda r: r["rank"])[:TOP_N_ALL]
     meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
             for k in ("last_pp_update", "daily_updated")}
     payload = {"date": date, "rows": _rows(con, rows), "all": _rows(con, all_rows), "meta": meta,
