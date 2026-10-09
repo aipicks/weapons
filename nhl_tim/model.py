@@ -203,7 +203,7 @@ def build_rows(con, date, all_players=False):
         if opp_t:
             ga_eff = opp_t["ga_pg"] if not oc_ else (1 - wo) * opp_t["ga_pg"] + wo * oc_["ga_pg"]
             parts["opp GA"] = W["opp_ga"] * (ga_eff - league_ga)
-        sv = _goalie_sv_eff(gb) if gp_row and gp_row["status"] != "Unknown" else None
+        sv = _goalie_sv_eff(gb) if gp_row and gp_row["goalie_name"] else None
         if sv is not None:
             parts["goalie"] = -W["goalie_sv"] * (sv - W["league_sv"])
         z_fund = z + sum(parts.values())

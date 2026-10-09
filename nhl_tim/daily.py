@@ -104,67 +104,47 @@ def ingest_slate(con, date, force=True):
 
 
 def ingest_goalies(con, date):
+    """Daily Faceoff is the source of truth; RotoWire only fills games Daily Faceoff doesn't list (is_fallback=1)."""
+    import datetime as dt
+    import zoneinfo
+    from .sources import dailyfaceoff
+    today = dt.datetime.now(zoneinfo.ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
     games = con.execute("SELECT * FROM game WHERE date=?", (date,)).fetchall()
     by_pair = {frozenset((g["home"], g["away"])): g["event_id"] for g in games}
+    abbr = nhl_api.team_abbrevs(force=False)
+    con.execute("DELETE FROM goalie_proj WHERE event_id IN (SELECT event_id FROM game WHERE date=?)", (date,))
     n = 0
     unmatched = []
-    for r in rotowire.fetch(date):
-        r["team"], r["opp"] = norm_team(r["team"]), norm_team(r["opp"])
-        eid = by_pair.get(frozenset((r["team"], r["opp"])))
-        if not eid:
-            continue
-        gid = _find_goalie(con, r["team"], r["goalie"]) if r["goalie"] else None
-        if r["goalie"] and gid is None:
-            unmatched.append((r["team"], r["goalie"]))
-        con.execute("INSERT OR REPLACE INTO goalie_proj VALUES(?,?,?,?,?,?,?)",
-                    (eid, r["team"], r["opp"], r["goalie"], gid, r["status"], 0))
+    seen = set()
+
+    def put(eid, team, opp, name, status, fallback, source, note):
+        nonlocal n
+        gid = _find_goalie(con, team, name) if name else None
+        if name and gid is None:
+            unmatched.append((team, name))
+        con.execute("INSERT OR REPLACE INTO goalie_proj VALUES(?,?,?,?,?,?,?,?,?)",
+                    (eid, team, opp, name, gid, status, fallback, source, note))
+        seen.add((eid, team))
         n += 1
+
+    try:
+        for r in dailyfaceoff.starting_goalies(date, today):
+            t, o = abbr.get(r["team"]), abbr.get(r["opp"])
+            eid = by_pair.get(frozenset((t, o))) if t and o else None
+            if eid:
+                put(eid, t, o, r["goalie"], r["status"], 0, "Daily Faceoff", r["note"])
+    except Exception as e:  # Daily Faceoff down or changed: fall back entirely
+        print("Daily Faceoff goalies failed:", e)
+    try:
+        for r in rotowire.fetch(date):
+            t, o = norm_team(r["team"]), norm_team(r["opp"])
+            eid = by_pair.get(frozenset((t, o)))
+            if eid and (eid, t) not in seen and r["goalie"]:
+                st = {"Confirmed": "Confirmed", "Expected": "Likely"}.get(r["status"], "Unconfirmed")
+                put(eid, t, o, r["goalie"], st, 1, "RotoWire (fallback)", "")
+    except Exception as e:
+        print("RotoWire fallback failed:", e)
     return n, unmatched
-
-
-def update_team_stats(con, season=CUR_SEASON):
-    """Current-season team GA/G + rank (small sample early; ranked among teams that have played)."""
-    abbr = nhl_api.team_abbrevs(force=False)
-    rows = [r for r in nhl_api.teams(season, True) if r["gamesPlayed"] > 0]
-    ranks = _ranks([(r["teamFullName"], r["goalsAgainstPerGame"]) for r in rows], "ga", True)
-    for r in rows:
-        n = r["teamFullName"]
-        if n in abbr:
-            con.execute("INSERT OR REPLACE INTO team_season VALUES(?,?,?,?,?)",
-                        (abbr[n], season, r["gamesPlayed"], r["goalsAgainstPerGame"], ranks[n]))
-
-
-def update_toi(con):
-    """Season-average time on ice per game (seconds): previous season cached, current refreshed daily."""
-    from .config import PREV_SEASON
-    for season, force in ((PREV_SEASON, False), (CUR_SEASON, True)):
-        for r in nhl_api.skaters(season, force):
-            if r.get("timeOnIcePerGame") is not None:
-                con.execute("INSERT OR REPLACE INTO player_toi VALUES(?,?,?)",
-                            (r["playerId"], season, r["timeOnIcePerGame"]))
-
-
-def update_pp_time(con):
-    """Player PP time on ice per game, and each team's time shorthanded (penalty kill) per game, in seconds.
-    Previous season cached once; current season refreshed daily."""
-    from .config import PREV_SEASON
-    abbr = nhl_api.team_abbrevs(force=False)
-    for season, force in ((PREV_SEASON, False), (CUR_SEASON, True)):
-        for r in nhl_api.skater_powerplay(season, force):
-            if r.get("ppTimeOnIcePerGame") is not None:
-                con.execute("INSERT OR REPLACE INTO player_pp_toi VALUES(?,?,?)",
-                            (r["playerId"], season, r["ppTimeOnIcePerGame"]))
-        for r in nhl_api.team_penaltykill(season, force):
-            n = r["teamFullName"]
-            if n in abbr and r.get("pkTimeOnIcePerGame") is not None and r["gamesPlayed"] > 0:
-                con.execute("INSERT OR REPLACE INTO team_pk_toi VALUES(?,?,?)", (abbr[n], season, r["pkTimeOnIcePerGame"]))
-
-
-def update_xg(con):
-    """Individual expected goals: previous season cached once, current season refreshed daily."""
-    for year, season, force in ((2025, 20252026, False), (2026, 20262027, True)):
-        for pid, d in moneypuck.fetch(year, force).items():
-            con.execute("INSERT OR REPLACE INTO player_xg VALUES(?,?,?,?,?)", (pid, season, d["gp"], d["xg"], d["goals"]))
 
 
 def update_daily(date):

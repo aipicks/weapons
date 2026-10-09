@@ -11,7 +11,7 @@ from .table import _et, team_color, third_color
 
 TEMPLATE = (Path(__file__).parent / "site_template.html").read_text(encoding="utf-8")
 TOP_N_ALL = 30  # All Players tab shows the top N players by EV
-STATUS = {"Confirmed": "Confirmed", "Expected": "Projected", "Unknown": "Unknown"}
+STATUS = {"Confirmed": "Confirmed", "Likely": "Likely", "Unconfirmed": "Unconfirmed"}
 
 
 def _goalie_season(con, s):
@@ -98,6 +98,26 @@ def _rows(con, rows):
     return out
 
 
+def _goalie_panel(con, date):
+    """Every game's two starting goalies with status and last-season / this-season numbers."""
+    out = []
+    for g in con.execute("SELECT * FROM game WHERE date=? ORDER BY start_utc, event_id", (date,)):
+        tm, _ = _et(g["start_utc"])
+        sides = []
+        for team in (g["away"], g["home"]):
+            p = con.execute("SELECT * FROM goalie_proj WHERE event_id=? AND team=?", (g["event_id"], team)).fetchone()
+            if not p or not p["goalie_name"]:
+                sides.append({"team": team, "name": None, "status": "Unconfirmed"})
+                continue
+            gid = p["goalie_id"]
+            prev = _goalie_season(con, con.execute("SELECT * FROM goalie_season WHERE nhl_id=? AND season=?", (gid, PREV_SEASON)).fetchone()) if gid else None
+            cur = _goalie_season(con, con.execute("SELECT * FROM goalie_season WHERE nhl_id=? AND season=?", (gid, CUR_SEASON)).fetchone()) if gid else None
+            sides.append({"team": team, "name": p["goalie_name"], "status": STATUS.get(p["status"], "Unconfirmed"),
+                          "p": prev, "c": cur, "fallback": bool(p["is_fallback"]), "note": p["note"] or ""})
+        out.append({"game": f"{g['away']} @ {g['home']}", "time": tm, "sides": sides})
+    return out
+
+
 def build_site(date):
     con = connect()
     rows, missing = build_rows(con, date)
@@ -106,7 +126,7 @@ def build_site(date):
     meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
             for k in ("last_pp_update", "daily_updated")}
     payload = {"date": date, "rows": _rows(con, rows), "all": _rows(con, all_rows), "meta": meta,
-               "missing": [m[0] for m in missing]}
+               "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")

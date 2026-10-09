@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS game(
   date TEXT, event_id TEXT PRIMARY KEY, start_utc TEXT, away TEXT, home TEXT);
 CREATE TABLE IF NOT EXISTS goalie_proj(
   event_id TEXT, team TEXT, opp TEXT, goalie_name TEXT, goalie_id INTEGER, status TEXT, is_fallback INTEGER,
+  source TEXT, note TEXT,
   PRIMARY KEY(event_id, team));
 CREATE TABLE IF NOT EXISTS odds_game(
   event_id TEXT, book TEXT, ts TEXT, total REAL, over_price REAL, under_price REAL, ml_home REAL, ml_away REAL,
@@ -45,4 +46,8 @@ def connect():
     cols = [r[1] for r in con.execute('PRAGMA table_info(odds_atg)')]
     if 'no_american' not in cols:  # migrate older databases
         con.execute('ALTER TABLE odds_atg ADD COLUMN no_american REAL')
+    gcols = [r[1] for r in con.execute('PRAGMA table_info(goalie_proj)')]
+    for c_ in ('source', 'note'):
+        if c_ not in gcols:
+            con.execute(f'ALTER TABLE goalie_proj ADD COLUMN {c_} TEXT')
     return con

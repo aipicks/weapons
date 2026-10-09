@@ -31,3 +31,25 @@ def fetch_all():
                             "updated_at": combos.get("updatedAt")})
         time.sleep(0.5)
     return out
+
+
+STATUS = {"Confirmed": "Confirmed", "Likely": "Likely"}  # anything else (no news yet) -> Unconfirmed
+
+
+def starting_goalies(date, today):
+    """Daily Faceoff starting goalies for one slate. Returns [{team, opp, goalie, status, note}] (team = goalie's team,
+    as full names; caller maps to abbreviations). `today` is the ET date the unparameterised page shows."""
+    url = "https://www.dailyfaceoff.com/starting-goalies" + ("" if date == today else f"/{date}")
+    pp = _next_data(url)
+    if pp.get("date") != date:
+        return []
+    out = []
+    for g in pp["data"]:
+        for side, other in (("home", "away"), ("away", "home")):
+            name = g.get(f"{side}GoalieName")
+            if not name:
+                continue
+            out.append({"team": g[f"{side}TeamName"], "opp": g[f"{other}TeamName"], "goalie": name,
+                        "status": STATUS.get(g.get(f"{side}NewsStrengthName"), "Unconfirmed"),
+                        "note": (g.get(f"{side}NewsDetails") or "").strip()})
+    return out
