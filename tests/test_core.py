@@ -55,3 +55,14 @@ def test_update_daily_steps_exist():
     import re
     for name in re.findall(r"\b(update_\w+|ingest_\w+)\(", src):
         assert callable(getattr(daily, name, None)), name
+
+
+def test_game_outcome_probs():
+    from nhl_tim.games import outcome_probs
+    p, over, reg = outcome_probs(3.0, 3.0, None)
+    assert abs(p - 0.5) < 1e-9                      # equal teams: coin flip
+    p2, _, _ = outcome_probs(3.5, 2.5, None)
+    assert p2 > 0.5
+    o, u, push = over(6.0)
+    assert abs(o + u + push - 1) < 1e-9 and 0 < o < 1
+    assert over(5.5)[0] > over(6.5)[0]               # higher line, lower P(over)

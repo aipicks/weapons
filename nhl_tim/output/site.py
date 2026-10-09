@@ -7,6 +7,7 @@ from ..sources import nhl_api
 from ..db import connect
 from ..model import build_rows
 from ..sog import build_sog_rows
+from ..games import build_game_rows
 from ..odds_math import fmt_american
 from .table import _et, team_color, third_color
 
@@ -158,6 +159,49 @@ def _sog_payload(con, date):
     return out
 
 
+def _games_payload(con, date):
+    def f1(x, d=1):
+        return None if x is None else round(x, d)
+
+    def side(c):
+        return None if not c else {"side": c["side"], "team": c.get("team"), "line": c.get("line"), "price": fmt_american(c["price"]),
+                                   "book": c["book"], "p": round(c["p"] * 100, 1), "market": round(c["market"] * 100, 1),
+                                   "ev": round(c["ev"] * 100, 1)}
+    out = []
+    for g in build_game_rows(con, date):
+        tm, _ = _et(g["start"])
+
+        def gl(row):
+            if not row or not row["goalie_name"]:
+                return None
+            return {"name": row["goalie_name"], "status": STATUS.get(row["status"], "Unconfirmed")}
+        ml, tot = g["ml"], g["total"]
+        ref = next((b for b in g["books"] if b["book"] == "fanduel"), g["books"][0] if g["books"] else None)
+        out.append({
+            "eid": g["eid"], "start": g["start"], "time": tm, "home": g["home"], "away": g["away"],
+            "lamH": round(g["lamH"], 2), "lamA": round(g["lamA"], 2), "tot": round(g["lamH"] + g["lamA"], 2),
+            "b2b": g["b2b"], "gh": gl(g["goalie_home"]), "ga": gl(g["goalie_away"]),
+            "pre": {"home": round(g["p_home_model"] * 100, 1), "away": round((1 - g["p_home_model"]) * 100, 1)},
+            "mkt": {"ml_h": fmt_american(ref["ml_home"]) if ref and ref["ml_home"] is not None else None,
+                    "ml_a": fmt_american(ref["ml_away"]) if ref and ref["ml_away"] is not None else None,
+                    "line": ref["total"] if ref else None,
+                    "over": fmt_american(ref["over"]) if ref and ref["over"] is not None else None,
+                    "under": fmt_american(ref["under"]) if ref and ref["under"] is not None else None},
+            "ml": None if not ml else {"fair_h": round(ml["fair_home"] * 100, 1), "model_h": round(ml["model_home"] * 100, 1),
+                                       "final_h": round(ml["final_home"] * 100, 1), "best": side(ml["best"]), "label": ml["label"],
+                                       "cands": [side(c) for c in ml["cands"]]},
+            "total": None if not tot else {"line": tot["line"], "model_over": round(tot["model_over"] * 100, 1),
+                                           "fair_over": round(tot["fair_over"] * 100, 1), "best": side(tot["best"]), "label": tot["label"]},
+            "books": [{"b": b["book"], "mh": fmt_american(b["ml_home"]) if b["ml_home"] is not None else None,
+                       "ma": fmt_american(b["ml_away"]) if b["ml_away"] is not None else None, "t": b["total"],
+                       "o": fmt_american(b["over"]) if b["over"] is not None else None,
+                       "u": fmt_american(b["under"]) if b["under"] is not None else None} for b in g["books"]],
+            "st": {k: {kk: f1(vv, 2) if kk not in ("gp_c",) else vv for kk, vv in v.items()} for k, v in g["stats"].items()},
+            "parts": {"h": {k: f1(v, 2) for k, v in g["h"].items()}, "a": {k: f1(v, 2) for k, v in g["a"].items()}},
+        })
+    return out
+
+
 def _goalie_panel(con, date):
     """Every game's two starting goalies with status and last-season / this-season numbers."""
     out = []
@@ -188,7 +232,7 @@ def build_site(date):
     meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
             for k in ("last_pp_update", "daily_updated")}
     payload = {"date": date, "rows": _rows(con, rows), "all": _rows(con, all_rows), "meta": meta,
-               "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date), "sog": _sog_payload(con, date)}
+               "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date), "sog": _sog_payload(con, date), "games": _games_payload(con, date)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")

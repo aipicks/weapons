@@ -55,3 +55,15 @@ SOG = {
     "nb_r": 8.0,          # negative binomial dispersion (variance = mu + mu^2 / r)
     "market_weight": 0.6, # logit blend weight on the de-vigged market vs the model
 }
+
+# Game (moneyline / total) model priors (starting values, not fitted)
+GAME = {
+    "cur_k": 20,           # games before this season's team rates outweigh last season's
+    "goalie_shots_k": 900, # shots faced before a goalie's goals-vs-expected is trusted half-way
+    "home": 1.035, "away": 0.975,   # home ice scoring multipliers
+    "b2b_off": 0.97, "b2b_def": 1.03,  # second night of a back-to-back: fewer goals for, more against
+    "ot_skill": 0.5,       # how much better teams win overtime/shootout (0 = coin flip, 1 = proportional to goal share)
+    "ot_goal": 0.55,       # chance a tied game ends on an overtime goal (adds one goal to the total)
+    "market_w": 0.7,       # weight on the de-vigged market in the final probability (logit blend)
+    "bet_ev": 0.03, "lean_ev": 0.01,  # EV thresholds for BET / LEAN (below LEAN = PASS)
+}

@@ -97,6 +97,25 @@ h1 span{color:var(--accent)}
 .gg .gh{font:600 14px var(--display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .gg .gs{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;line-height:1.5}
 .gg .gs .t{font:500 11px var(--mono);color:var(--muted);min-width:34px}
+.gcard{background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-top:10px;padding:10px 12px;font-size:13px}
+.ghead{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font:600 18px var(--display);letter-spacing:.04em;text-transform:uppercase}
+.ghead span{font:400 12px var(--mono);color:var(--muted);text-transform:none}
+.gg2{margin:6px 0;line-height:1.7}
+.gm2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px 14px;margin-bottom:6px}
+.gm2 h4{margin:0 0 3px;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.bet{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;margin-top:6px;padding:7px 9px;border-radius:6px;border:1px solid var(--line);background:var(--mid-bg)}
+.bet.good{background:var(--good-bg)}.bet.warn{background:var(--warn-bg)}.bet.bad{background:var(--bad-bg)}
+.bet .mk{font:500 10.5px var(--mono);color:var(--muted);min-width:76px}
+.bet .bp{flex-basis:100%;font-size:12px}
+.cmp{width:100%;border-collapse:collapse;margin-top:8px;font:12px var(--mono)}
+.cmp th,.cmp td{border-top:1px dashed var(--line);padding:3px 4px;text-align:left}
+.cmp td:first-child,.cmp th:first-child{color:var(--muted)}
+.lines{margin-top:6px;font:11px var(--mono);color:var(--muted)}
+.gtop{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:10px}
+.gtop h3{margin:0 0 6px;font:600 16px var(--display);letter-spacing:.05em;text-transform:uppercase}
+.gp{padding:3px 0;font-size:13px}
+.how{margin-top:14px;font-size:12.5px;line-height:1.55;color:var(--muted)}
+.how summary{cursor:pointer;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase}
 .more{display:block;width:100%;margin-top:10px;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 15px var(--display);letter-spacing:.04em;text-transform:uppercase;cursor:pointer}
 .empty{padding:40px 0;text-align:center;color:var(--muted)}
 @media (prefers-reduced-motion:no-preference){.meter div{transition:width .4s}}
@@ -131,6 +150,14 @@ h1 span{color:var(--accent)}
     </div>
   </div>
   <main id="list"></main>
+  <section id="gamesbox" hidden></section>
+  <template id="howgames"><details class="how" open><summary>How the game model works</summary>
+<p><b>1. Expected goals.</b> For team A vs team B: xG = EV + PP + SH. EV = (EV minutes / 60) x A's 5v5 xGF/60 x B's 5v5 xGA/60 / league 5v5 rate. PP = (A's expected power-play minutes / 60) x A's PP xGF/60 x B's PK xGA/60 / league PK rate. SH = A's short-handed xGF/60 x B's power-play minutes / 60. A's power-play minutes = A's PP minutes per game x B's shorthanded minutes per game / league average. Rates blend last season with this season by games played (this season's weight = GP / (GP + 20)). Source: MoneyPuck team xG by situation.</p>
+<p><b>2. Goals.</b> lambda = xG x league goals-per-xG anchor (last season's real scoring, because 5v5/PP/PK xG leaves out empty-net and 3-on-3) x opposing goalie factor x home ice (home x1.035, away x0.975) x back-to-back (x0.97 for, x1.03 against). Goalie factor = 1 + shrunk (goals allowed - xG faced) / xG faced, capped at +/-12%, with small samples shrunk by shots / (shots + 900) and damped for Likely (x0.8) or Unconfirmed (x0.5) starters. Goals are Poisson.</p>
+<p><b>3. Probabilities.</b> P(A wins) = P(A scores more) + P(tie) x overtime share, where overtime share = 0.5 + 0.5 x (A's goal share - 0.5). The total adds one goal when a tied game ends on an overtime goal (55% of ties). P(over) is read off that distribution at each book's line.</p>
+<p><b>4. Final probability and EV.</b> logit(final) = 0.7 x logit(de-vigged market) + 0.3 x logit(model), because the market already prices most of this. EV = final x payout - (1 - final), at the best price across books (totals compare each book at its own line).</p>
+<p><b>5. Calls.</b> BET = EV +3% or better, LEAN = +1% to +3%, PASS = below. Weights are starting priors, not fitted. Nothing here has been tested against results, and these markets are very efficient, so most games will be PASS.</p></details></template>
+
   <div class="legend">
     <div class="key"><span class="tag good">Top third of pool</span><span class="tag warn">Middle third</span><span class="tag bad">Bottom third</span></div>
     <p>The Shots on Goal tab uses player shot lines from five sportsbooks: it projects each player's shots (recent form, season rate, ice time, power play time, opponent shots allowed, game pace), converts that to P(over) and P(under) at the line, blends with the de-vigged market, and shows the side with the higher EV. The model's probability is shown as it comes out, next to the market's, so a big EV means we disagree with the market, not that the market is wrong. Opponent shots against: rank 1 = fewest allowed (red, tough for shooters). The +EV GOAL SCORERS tab lists only the 30 players with the highest EV across every game on the slate, and only players the model gives at least a 15% chance to score. EV is the expected profit per $1 bet if the model probability is right: model % × payout − 1, at the FanDuel anytime-goal price shown. The model leans on the market itself and is not calibrated, so treat large EV as a lead to check, not a guarantee. On the Tim Hortons tab players are ranked by model probability within each pick pool (Tim Hortons tab) or across every player with anytime-goal odds (All Players tab). Model P(goal) blends the sportsbook anytime-goal consensus (vig removed) with goal-game rate, power-play unit, team implied total, opponent defense and goalie. Weights are starting priors, not fitted. Matchup colors: red = tough for the shooter, green = favorable. Market and goal-game chips compare a player with the rest of his own pool (top third strong/high, bottom third weak/low), so a Pick #3 depth player can be "strong" at 18%. Preseason projected defence ranking is each team's projected defensive-unit rank (1 = best) and is not used in the model. Opponent defense: ranks 1–10 red, 11–20 gray, 21–32 green. Goalie ranks use thirds of qualified goalies (20+ GP last season). * = changed teams since last season. "Projected" goalie means RotoWire lists him but the team has not confirmed.</p>
@@ -142,14 +169,14 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pools = [...new Set(D.rows.map(r => r.pool))].sort();
 let view = 'tim', pool = pools[0], grouped = false, limit = 40, sortev = false, evonly = false;
-try { const s = JSON.parse(localStorage.getItem('pb')||'{}'); if (pools.includes(s.pool)) pool = s.pool; grouped = !!s.grouped; if (['all','tim','sog'].includes(s.view)) view = s.view; } catch(e){}
+try { const s = JSON.parse(localStorage.getItem('pb')||'{}'); if (pools.includes(s.pool)) pool = s.pool; grouped = !!s.grouped; if (['all','tim','sog','games'].includes(s.view)) view = s.view; } catch(e){}
 const save = () => { try { localStorage.setItem('pb', JSON.stringify({pool, grouped, view})); } catch(e){} };
 
 let sortKey = 'default', sortAsc = false;
 const LINE_LABEL = {F1:'Line 1',F2:'Line 2',F3:'Line 3',F4:'Line 4',D1:'Pair 1',D2:'Pair 2',D3:'Pair 3'};
 const sp0 = '<span class="sep">|</span>';
 const label = p => p ? 'Pick #'+p : 'All priced';
-const VIEWS = {tim:'Tim Hortons NHL Challenge', all:'+EV GOAL SCORERS', sog:'Shots on Goal'};
+const VIEWS = {tim:'Tim Hortons NHL Challenge', all:'+EV GOAL SCORERS', sog:'Shots on Goal', games:'Game Bets'};
 const col = c => c ? `c-${c}` : 'c-gray';
 const rk = (v, c) => v ? `<span class="${col(c)}">#${v}</span>` : '<span class="c-na">unranked</span>';
 const PP = {1:['PP1 ✅','good'], 2:['PP2 ✔','warn'], 0:['NO PP UNIT','bad']};
@@ -221,6 +248,53 @@ function sogRow(r){
       <div class="ln"><span class="lab">Lines</span><span class="v">${books}</span></div>
     </div></article>`;
 }
+const lab = l => ({BET:'good', LEAN:'warn', PASS:''}[l]);
+const evs = v => (v>0?'+':'')+v.toFixed(1)+'%';
+const stat = (a,b,d=1,suf='') => `${a==null?'?':a.toFixed(d)+suf} → ${b==null?'?':b.toFixed(d)+suf}`;
+const BOOKSHORT = b => b.replace('espnbet','ESPN').replace('draftkings','DK').replace('fanduel','FD').replace('betmgm','MGM').replace('bovada','Bov').replace('caesars','CZR');
+function gcard(g){
+  const m = g.ml, t = g.total, sp = '<span class="sep">|</span>';
+  const gk = (x,tm) => x ? `${tm} ${esc(x.name)} <span class="tag ${STC[x.status]}">${x.status}</span>` : `${tm} no goalie listed`;
+  const bet = (title, b, lbl) => b ? `<div class="bet ${lab(lbl)}"><span class="mk">${title}</span><b>${b.team?esc(b.team)+' ML':b.side+' '+b.line} ${b.price}</b> <small>${BOOKSHORT(b.book)}</small><span class="bp">our ${b.p}% vs market ${b.market}% ${sp} EV <b>${evs(b.ev)}</b> <span class="tag ${lab(lbl)}">${lbl}</span></span></div>` : '';
+  const h = g.st.home, a = g.st.away;
+  const row = (l, ax, hx) => `<tr><td>${l}</td><td>${ax}</td><td>${hx}</td></tr>`;
+  return `<article class="gcard">
+    <div class="ghead"><b>${g.away} @ ${g.home}</b><span>${g.time.replace(' PM','')}</span>${g.b2b.away?`<span class="tag bad">${g.away} B2B</span>`:''}${g.b2b.home?`<span class="tag bad">${g.home} B2B</span>`:''}</div>
+    <div class="gg2">${gk(g.ga,g.away)}<br>${gk(g.gh,g.home)}</div>
+    <div class="gm2">
+      <div><h4>Market (FanDuel)</h4><div>ML ${g.away} <b>${g.mkt.ml_a||'?'}</b> / ${g.home} <b>${g.mkt.ml_h||'?'}</b></div><div>Total <b>${g.mkt.line??'?'}</b> (O ${g.mkt.over||'?'} / U ${g.mkt.under||'?'})</div></div>
+      <div><h4>Our projection</h4><div>${g.away} <b>${g.lamA.toFixed(2)}</b> – ${g.home} <b>${g.lamH.toFixed(2)}</b> goals (total ${g.tot.toFixed(2)})</div>${m?`<div>Win: ${g.away} ${(100-m.model_h).toFixed(1)}% / ${g.home} ${m.model_h.toFixed(1)}% <small>(market ${(100-m.fair_h).toFixed(1)}% / ${m.fair_h.toFixed(1)}%)</small></div>`:''}</div>
+    </div>
+    ${bet('MONEYLINE', m&&m.best, m&&m.label)}${bet('TOTAL', t&&t.best, t&&t.label)}
+    <table class="cmp"><tr><th>25–26 → 26–27</th><th>${g.away}</th><th>${g.home}</th></tr>
+      ${row('xG share (all)', stat(a.xgp,a.xgc,1,'%'), stat(h.xgp,h.xgc,1,'%'))}
+      ${row('xG share 5v5', stat(a.ev_xgp,a.ev_xgc,1,'%'), stat(h.ev_xgp,h.ev_xgc,1,'%'))}
+      ${row('Goals for/G', stat(a.gf_p,a.gf_c,2), stat(h.gf_p,h.gf_c,2))}
+      ${row('Goals against/G', stat(a.ga_p,a.ga_c,2), stat(h.ga_p,h.ga_c,2))}
+      ${row('Shots for/G', stat(a.sf_p,a.sf_c), stat(h.sf_p,h.sf_c))}
+      ${row('Shots against/G', stat(a.sa_p,a.sa_c), stat(h.sa_p,h.sa_c))}
+      ${row('Power play %', stat(a.pp_p,a.pp_c,1,'%'), stat(h.pp_p,h.pp_c,1,'%'))}
+      ${row('Penalty kill %', stat(a.pk_p,a.pk_c,1,'%'), stat(h.pk_p,h.pk_c,1,'%'))}
+    </table>
+    <div class="lines">${g.books.map(b=>`${BOOKSHORT(b.b)}: ML ${b.ma||'?'}/${b.mh||'?'} · ${b.t??'?'} (O ${b.o||'?'}/U ${b.u||'?'})`).join('<br>')}</div>
+  </article>`;
+}
+function renderGames(){
+  $('#list').hidden = true; $('#gamesbox').hidden = false;
+  $('#tabs').hidden = true; $('#filters').hidden = true; $('#by').hidden = true;
+  const picks = [];
+  for (const g of D.games) {
+    if (g.ml && g.ml.label !== 'PASS') picks.push({g, mk:'Moneyline', b:g.ml.best, l:g.ml.label});
+    if (g.total && g.total.label !== 'PASS') picks.push({g, mk:'Total', b:g.total.best, l:g.total.label});
+  }
+  picks.sort((x,y) => y.b.ev - x.b.ev);
+  const top = picks.length
+    ? `<div class="gtop"><h3>Best bets today</h3>${picks.map(p=>`<div class="gp"><span class="tag ${lab(p.l)}">${p.l}</span> <b>${p.g.away} @ ${p.g.home}</b> ${p.mk}: ${p.b.team?esc(p.b.team)+' ML':p.b.side+' '+p.b.line} ${p.b.price} <small>${BOOKSHORT(p.b.book)}</small> <span class="sep">|</span> EV <b>${evs(p.b.ev)}</b></div>`).join('')}</div>`
+    : '<div class="gtop"><h3>Best bets today</h3><div class="gp">No game clears the +1% EV bar today.</div></div>';
+  $('#gamesbox').innerHTML = top + D.games.map(gcard).join('') + document.getElementById('howgames').innerHTML;
+  $('#count').textContent = D.games.length + ' games';
+  $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
+}
 function baseRows(){
   return view === 'tim' ? D.rows.filter(r => r.pool === pool) : D.all;
 }
@@ -238,6 +312,8 @@ function filtered(){
   return out;
 }
 function render(){
+  if (view === 'games') return renderGames();
+  $('#gamesbox').hidden = true; $('#list').hidden = false;
   const all = view !== 'tim';
   const rf = view === 'sog' ? sogRow : row;
   const rows = filtered();
@@ -262,7 +338,7 @@ function render(){
   $('#tabs').hidden = view !== 'tim';
   $('#tabs').innerHTML = pools.map(p => `<button class="tab" role="tab" aria-selected="${p===pool}" data-p="${p}">${label(p)}</button>`).join('');
   $('#filters').hidden = view === 'sog';
-  $('#by').setAttribute('aria-pressed', grouped);
+  $('#by').setAttribute('aria-pressed', grouped); $('#by').hidden = false;
   $('#evonly').hidden = true;
   $('#f-dir').textContent = sortAsc ? 'Low → high' : 'High → low';
   $('#f-dir').hidden = sortKey === 'default';

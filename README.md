@@ -54,3 +54,11 @@ Estimates only, not betting advice.
 (NHL API). `build_site` projects each lined player's shots (`nhl_tim/sog.py`, priors in `config.SOG`), turns that into
 P(over)/P(under) at the line with a negative-binomial distribution, blends with the de-vigged market, and ranks the best side by EV.
 Props.Cash is a paid, login-only product and is not scraped.
+
+## Game Bets tab (moneyline and totals)
+`nhl_tim/games.py`. Expected goals per team = EV + power play + short-handed xG, built from MoneyPuck 5v5 / PP / PK expected-goal
+rates (last season blended with this season by games played), expected power-play minutes (own PP minutes x opponent
+shorthanded minutes), the opposing starting goalie (goals vs expected, shrunk, damped for unconfirmed starters), home ice and
+back-to-backs. Goals are Poisson, giving P(win) with overtime and P(over/under) at each book's line. The final probability is a
+logit blend of 70% de-vigged market and 30% model; EV is taken at the best price across books. BET = EV +3%+, LEAN = +1%+, else PASS.
+All weights live in `config.GAME`; they are starting priors, not fitted.

@@ -208,6 +208,18 @@ def update_pp_time(con):
                 con.execute("INSERT OR REPLACE INTO team_pk_toi VALUES(?,?,?)", (abbr[n], season, r["pkTimeOnIcePerGame"]))
 
 
+def update_team_mp(con):
+    """MoneyPuck team xG by situation (5v5, power play, penalty kill) and goalie xG-vs-goals; last season cached once."""
+    from .config import PREV_SEASON
+    for year, season, force in ((2025, PREV_SEASON, False), (2026, CUR_SEASON, True)):
+        for team, sits in moneypuck.fetch_teams(year, force).items():
+            for sit, d in sits.items():
+                con.execute("INSERT OR REPLACE INTO team_mp VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                            (team, season, sit, d["gp"], d["ice"], d["xgf"], d["xga"], d["gf"], d["ga"], d["sf"], d["sa"]))
+        for pid, d in moneypuck.fetch_goalies(year, force).items():
+            con.execute("INSERT OR REPLACE INTO goalie_xg VALUES(?,?,?,?,?,?)", (pid, season, d["gp"], d["xg"], d["goals"], d["shots"]))
+
+
 def update_xg(con):
     """Individual expected goals: previous season cached once, current season refreshed daily."""
     for year, season, force in ((2025, 20252026, False), (2026, 20262027, True)):
@@ -232,6 +244,10 @@ def update_daily(date):
     update_team_stats(con)
     update_team_shots(con)
     update_lines(con)
+    try:
+        update_team_mp(con)
+    except Exception as e:  # game model degrades gracefully without it
+        print("MoneyPuck team data failed:", e)
     s = ingest_slate(con, date)
     n, um = ingest_goalies(con, date)
     con.execute("INSERT OR REPLACE INTO meta VALUES('daily_updated', datetime('now'))")

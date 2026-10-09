@@ -40,6 +40,11 @@ CREATE TABLE IF NOT EXISTS odds_sog(
   over_price REAL, under_price REAL, ts TEXT, PRIMARY KEY(event_id, player, book));
 CREATE TABLE IF NOT EXISTS player_line(
   nhl_id INTEGER PRIMARY KEY, team TEXT, grp TEXT, name TEXT);
+CREATE TABLE IF NOT EXISTS team_mp(
+  team TEXT, season INTEGER, sit TEXT, gp INTEGER, ice REAL, xgf REAL, xga REAL, gf REAL, ga REAL, sf REAL, sa REAL,
+  PRIMARY KEY(team, season, sit));
+CREATE TABLE IF NOT EXISTS goalie_xg(
+  nhl_id INTEGER, season INTEGER, gp INTEGER, xg REAL, goals REAL, shots REAL, PRIMARY KEY(nhl_id, season));
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 """
 
