@@ -6,6 +6,7 @@ from ..config import DATA, ROOT, CUR_SEASON, PREV_SEASON, PRESEASON_D, PRESEASON
 from ..sources import nhl_api
 from ..db import connect
 from ..model import build_rows
+from ..sog import build_sog_rows
 from ..odds_math import fmt_american
 from .table import _et, team_color, third_color
 
@@ -98,6 +99,38 @@ def _rows(con, rows):
     return out
 
 
+def _sog_payload(con, date):
+    out = []
+    for r in build_sog_rows(con, date):
+        tm, _ = _et(r["start"])
+        n_teams = con.execute("SELECT COUNT(*) FROM team_season WHERE season=?", (CUR_SEASON,)).fetchone()[0]
+        op, oc = r["opp_prev"], r["opp_cur"]
+        def sa(t, n=32):
+            return {"sa": round(t["sa_pg"], 1), "rank": int(t["sa_rank"]), "c": team_color(int(t["sa_rank"]), n),
+                    "gp": t["gp"]} if t and t["sa_pg"] else None
+        tier = "g" if r["rank"] <= r["n"] / 3 else "r" if r["rank"] > 2 * r["n"] / 3 else "m"
+        out.append({
+            "rank": r["rank"], "n": r["n"], "tier": tier, "eid": r["event_id"], "start": r["start"],
+            "game_name": f"{r['away']} @ {r['home']}", "time": tm, "name": r["name"], "team": r["team"],
+            "opp": r["opp"], "pos": r["pos"], "pp": r["pp_unit"], "side": r["side"], "line": r["line"],
+            "price": fmt_american(r["price"]), "p": round(r["p"] * 100, 1), "ev": round(r["ev"] * 100, 1),
+            "mu": round(r["mu"], 2), "mm": round(r["mu_market"], 2), "po": round(r["p_over"] * 100, 1), "pu": round(r["p_under"] * 100, 1),
+            "fair": round(r["fair_over"] * 100, 1),
+            "books": [{"b": b["book"], "l": b["line"], "o": fmt_american(b["o"]), "u": fmt_american(b["u"])} for b in r["books"]],
+            "s25": {"avg": round(r["sog_prev"], 2), "gp": r["gp_prev"]} if r["sog_prev"] is not None else None,
+            "s26": {"avg": round(r["sog_cur"], 2), "gp": r["gp_cur"]} if r["sog_cur"] is not None else None,
+            "form": round(r["form"], 1) if r["form"] is not None else None, "nform": r["n_form"], "last5": r["last5"],
+            "h10": round(r["hit_l10"] * 100) if r["hit_l10"] is not None else None,
+            "hs": round(r["hit_season"] * 100) if r["hit_season"] is not None else None,
+            "toi": {"p": _mmss(r["toi_prev"]), "c": _mmss(r["toi_cur"])},
+            "ppt": {"p": _mmss(r["pp_prev"]), "c": _mmss(r["pp_cur"])},
+            "opp_p": sa(op), "opp_c": sa(oc, n_teams),
+            "opp_pre": {"rank": PRESEASON_D[r["opp"]], "tie": r["opp"] in PRESEASON_D_TIES, "c": team_color(PRESEASON_D[r["opp"]])},
+            "why": [[c, t] for c, t in r["reasons"]],
+        })
+    return out
+
+
 def _goalie_panel(con, date):
     """Every game's two starting goalies with status and last-season / this-season numbers."""
     out = []
@@ -126,7 +159,7 @@ def build_site(date):
     meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
             for k in ("last_pp_update", "daily_updated")}
     payload = {"date": date, "rows": _rows(con, rows), "all": _rows(con, all_rows), "meta": meta,
-               "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date)}
+               "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date), "sog": _sog_payload(con, date)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")

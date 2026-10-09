@@ -48,3 +48,9 @@ Update `data/pools.csv` first (local only, gitignored).
 
 The published page contains sportsbook odds; check your odds provider's terms before sharing it widely.
 Estimates only, not betting advice.
+
+## Shots on goal tab
+`update_daily` also stores player shots-on-goal over/under lines (SportsGameOdds, five books) and team shots against
+(NHL API). `build_site` projects each lined player's shots (`nhl_tim/sog.py`, priors in `config.SOG`), turns that into
+P(over)/P(under) at the line with a negative-binomial distribution, blends with the de-vigged market, and ranks the best side by EV.
+Props.Cash is a paid, login-only product and is not scraped.

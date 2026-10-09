@@ -41,3 +41,17 @@ PRESEASON_D_ORDER = ["COL", "DAL", "MIN", "CAR", "BUF", "FLA", "NYR", "OTT", "MT
                      "PIT", "ANA", "CHI", "CGY", "SJS", "VAN"]
 PRESEASON_D_TIES = {"NJD", "PHI", "UTA", "CGY", "SJS"}
 PRESEASON_D = {t: i + 1 for i, t in enumerate(PRESEASON_D_ORDER)}
+
+# Shots-on-goal model priors (starting values, not fitted)
+SOG = {
+    "prior_games": 20,    # shrink last-season shots/game toward the position average
+    "cur_k": 12,          # games before this season's rate outweighs last season's
+    "form_w": 0.25,       # weight on the last 10 games
+    "opp_k": 15,          # opponent games before this season's shots-against outweighs last season's
+    "opp_exp": 0.7,       # exponent on opponent shots-against vs league average
+    "toi_exp": 0.5,       # exponent on this season's TOI vs last season's (scaled by games played)
+    "pace_exp": 0.25,     # exponent on team implied goal total vs 3.0
+    "pp_scale": 0.35,     # extra shots for PP players when the opponent takes many penalties
+    "nb_r": 8.0,          # negative binomial dispersion (variance = mu + mu^2 / r)
+    "market_weight": 0.6, # logit blend weight on the de-vigged market vs the model
+}
