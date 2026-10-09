@@ -65,7 +65,6 @@ GAME = {
     "ot_skill": 0.5,       # how much better teams win overtime/shootout (0 = coin flip, 1 = proportional to goal share)
     "ot_goal": 0.55,       # chance a tied game ends on an overtime goal (adds one goal to the total)
     "market_w": 0.7,       # weight on the de-vigged market in the final probability (logit blend)
-    "safe_min_price": -142,  # "safest pick" must pay at least this (e.g. -140 qualifies, -150 does not)
     "bet_ev": 0.03, "lean_ev": 0.01,  # EV thresholds for BET / LEAN (below LEAN = PASS)
 }
 

@@ -177,10 +177,9 @@ def _label(ev):
     return "BET" if ev >= GAME["bet_ev"] else "LEAN" if ev >= GAME["lean_ev"] else "PASS"
 
 
-def safest_pick(rows):
-    """The single most likely winning selection (moneyline side or total side, any of the five books) that pays -142 or better.
-    Used when no game offers a +EV bet. Ranked by our final win probability."""
-    floor = GAME["safe_min_price"]
+def best_value_pick(rows):
+    """The single selection with the highest EV across every moneyline side and every total side at all five books,
+    however likely or unlikely it is to win. Called a BET at +3% EV or better, a LEAN at +1%, otherwise 'best available'."""
     cands = []
     for g in rows:
         if g["ml"]:
@@ -189,10 +188,11 @@ def safest_pick(rows):
         if g["total"]:
             for c in g["total"]["_all"]:
                 cands.append({**c, "game": f"{g['away']} @ {g['home']}", "eid": g["eid"], "market_name": "Total", "label_sel": f"{c['side']} {c['line']:g}"})
-    ok = [c for c in cands if c["price"] >= floor]
-    if not ok:
+    if not cands:
         return None
-    return max(ok, key=lambda c: (c["p"], c["ev"]))
+    best = max(cands, key=lambda c: c["ev"])
+    best["label"] = _label(best["ev"])
+    return best
 
 
 def build_game_rows(con, date):

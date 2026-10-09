@@ -7,7 +7,7 @@ from ..sources import nhl_api
 from ..db import connect
 from ..model import build_rows
 from ..sog import build_sog_rows
-from ..games import build_game_rows, safest_pick
+from ..games import build_game_rows, best_value_pick
 from ..odds_math import fmt_american
 from .table import _et, team_color, third_color
 
@@ -204,11 +204,11 @@ def _games_payload(con, date):
 
 def _safest_payload(con, date):
     rows = build_game_rows(con, date)
-    c = safest_pick(rows)
+    c = best_value_pick(rows)
     if not c:
         return None
     return {"game": c["game"], "market": c["market_name"], "sel": c["label_sel"], "price": fmt_american(c["price"]),
-            "book": c["book"], "p": round(c["p"] * 100, 1), "mkt": round(c["market"] * 100, 1), "ev": round(c["ev"] * 100, 1)}
+            "book": c["book"], "p": round(c["p"] * 100, 1), "mkt": round(c["market"] * 100, 1), "ev": round(c["ev"] * 100, 1), "label": c["label"]}
 
 
 def _goalie_panel(con, date):
