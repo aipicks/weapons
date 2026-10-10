@@ -134,7 +134,7 @@ def ingest_goalies(con, date):
     today = dt.datetime.now(zoneinfo.ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
     games = con.execute("SELECT * FROM game WHERE date=?", (date,)).fetchall()
     by_pair = {frozenset((g["home"], g["away"])): g["event_id"] for g in games}
-    abbr = nhl_api.team_abbrevs(force=False)
+    abbr = {norm_name(k): v for k, v in nhl_api.team_abbrevs(force=False).items()}  # accent-insensitive (Montréal)
     con.execute("DELETE FROM goalie_proj WHERE event_id IN (SELECT event_id FROM game WHERE date=?)", (date,))
     n = 0
     unmatched = []
@@ -152,7 +152,7 @@ def ingest_goalies(con, date):
 
     try:
         for r in dailyfaceoff.starting_goalies(date, today):
-            t, o = abbr.get(r["team"]), abbr.get(r["opp"])
+            t, o = abbr.get(norm_name(r["team"])), abbr.get(norm_name(r["opp"]))
             eid = by_pair.get(frozenset((t, o))) if t and o else None
             if eid:
                 put(eid, t, o, r["goalie"], r["status"], 0, "Daily Faceoff", r["note"])
@@ -169,7 +169,7 @@ def update_team_stats(con, season=CUR_SEASON):
     for r in rows:
         n = r["teamFullName"]
         if n in abbr:
-            con.execute("INSERT OR REPLACE INTO team_season VALUES(?,?,?,?,?)",
+            con.execute("INSERT INTO team_season(team, season, gp, ga_pg, ga_rank) VALUES(?,?,?,?,?) ON CONFLICT(team, season) DO UPDATE SET gp=excluded.gp, ga_pg=excluded.ga_pg, ga_rank=excluded.ga_rank",
                         (abbr[n], season, r["gamesPlayed"], r["goalsAgainstPerGame"], ranks[n]))
 
 

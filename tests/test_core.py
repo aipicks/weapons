@@ -75,3 +75,12 @@ def test_only_five_books_allowed():
     con = connect()
     for tbl in ("odds_game", "odds_atg", "odds_sog"):
         assert not con.execute(f"SELECT 1 FROM {tbl} WHERE book NOT IN ({','.join('?' * 5)}) LIMIT 1", ALLOWED_BOOKS).fetchone()
+
+
+def test_team_season_insert_keeps_extra_columns():
+    """Regression: update_team_stats must work after sa_pg/sa_rank columns were added to team_season."""
+    import inspect
+    from nhl_tim import daily, history
+    for mod in (daily, history):
+        src = inspect.getsource(mod)
+        assert "INSERT OR REPLACE INTO team_season VALUES" not in src

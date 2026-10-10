@@ -23,7 +23,7 @@ def update_history(season=PREV_SEASON, force=False):
     ranks = _ranks([(r["teamFullName"], r["goalsAgainstPerGame"]) for r in trows], "ga", True)
     for r in trows:
         n = r["teamFullName"]
-        con.execute("INSERT OR REPLACE INTO team_season VALUES(?,?,?,?,?)",
+        con.execute("INSERT INTO team_season(team, season, gp, ga_pg, ga_rank) VALUES(?,?,?,?,?) ON CONFLICT(team, season) DO UPDATE SET gp=excluded.gp, ga_pg=excluded.ga_pg, ga_rank=excluded.ga_rank",
                     (abbr[n], season, r["gamesPlayed"], r["goalsAgainstPerGame"], ranks[n]))
 
     # goalies: rank among qualified only
