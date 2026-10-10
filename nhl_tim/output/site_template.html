@@ -138,6 +138,7 @@ h1 span{color:var(--accent)}
       <select id="f-game" aria-label="Game"></select>
       <select id="f-pos" aria-label="Position"><option value="">Forwards + defensemen</option><option value="F">Forwards</option><option value="D">Defensemen</option></select>
       <select id="f-pp" aria-label="Power play"><option value="">Any PP unit</option><option value="1">PP1</option><option value="2">PP2</option><option value="0">No PP unit</option></select>
+      <select id="f-side" aria-label="Over or Under" hidden><option value="">Over + Under</option><option value="Over">Over only</option><option value="Under">Under only</option></select>
       <select id="f-line" aria-label="Line"><option value="">Any line / pair</option><option value="F1">Line 1</option><option value="F2">Line 2</option><option value="F3">Line 3</option><option value="F4">Line 4</option><option value="D1">D pair 1</option><option value="D2">D pair 2</option><option value="D3">D pair 3</option></select>
       <select id="f-sort" aria-label="Sort by"><option value="default">Sort: default order</option>
         <option value="ggp">Goal-game % · last season</option><option value="ggc">Goal-game % · this season</option><option value="ggb">Goal-game % · combined</option>
@@ -337,7 +338,12 @@ function baseRows(){
   return view === 'tim' ? D.rows.filter(r => r.pool === pool) : D.all;
 }
 function filtered(){
-  if (view === 'sog') return D.sog;
+  if (view === 'sog') {
+    const q = $('#f-q').value.trim().toLowerCase(), team = $('#f-team').value, game = $('#f-game').value,
+          pos = $('#f-pos').value, pp = $('#f-pp').value, side = $('#f-side').value;
+    return D.sog.filter(r => (!q || r.name.toLowerCase().includes(q)) && (!team || r.team === team) && (!game || r.eid === game) &&
+      (!pos || r.pos === pos) && (pp === '' || String(r.pp) === pp) && (!side || r.side === side));
+  }
   const q = $('#f-q').value.trim().toLowerCase(), team = $('#f-team').value, game = $('#f-game').value,
         pos = $('#f-pos').value, pp = $('#f-pp').value;
   const line = $('#f-line').value;
@@ -372,15 +378,17 @@ function render(){
     if (all && sorted.length > shown.length) html += `<button class="more" id="more">Show ${Math.min(40, sorted.length-shown.length)} more (${sorted.length-shown.length} left)</button>`;
   }
   $('#list').innerHTML = html;
-  $('#count').textContent = rows.length + ' players' + (view==='all' ? ' · top 30 by EV (model probability 15%+) across the whole slate' : view==='sog' ? ' · best side of every player shots line, ranked by EV' : '');
+  $('#count').textContent = rows.length + (view === 'sog' ? ' players with a shots line' : ' players') + (view==='all' ? ' · top 30 by EV (model probability 15%+) across the whole slate' : view==='sog' ? ' · best side of every player shots line, ranked by EV' : '');
   $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
   $('#tabs').hidden = view !== 'tim';
   $('#tabs').innerHTML = pools.map(p => `<button class="tab" role="tab" aria-selected="${p===pool}" data-p="${p}">${label(p)}</button>`).join('');
-  $('#filters').hidden = view === 'sog';
+  $('#filters').hidden = false;
+  for (const id of ['f-line','f-sort']) $(`#${id}`).hidden = view === 'sog';
+  $('#f-side').hidden = view !== 'sog';
   $('#by').setAttribute('aria-pressed', grouped); $('#by').hidden = false;
   $('#evonly').hidden = true;
   $('#f-dir').textContent = sortAsc ? 'Low → high' : 'High → low';
-  $('#f-dir').hidden = sortKey === 'default';
+  $('#f-dir').hidden = sortKey === 'default' || view === 'sog';
   $('#evonly').setAttribute('aria-pressed', evonly);
 }
 function fillFilters(){
@@ -395,7 +403,7 @@ $('#tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); 
 $('#list').addEventListener('click', e => { if (e.target.id === 'more') { limit += 40; render(); } });
 $('#f-sort').addEventListener('change', () => { sortKey = $('#f-sort').value; sortAsc = sortKey === 'line'; limit = 40; render(); });
 $('#f-dir').onclick = () => { sortAsc = !sortAsc; render(); };
-for (const id of ['f-q','f-team','f-game','f-pos','f-pp','f-line']) $('#'+id).addEventListener('input', () => { limit = 40; render(); });
+for (const id of ['f-q','f-team','f-game','f-pos','f-pp','f-line','f-side']) $('#'+id).addEventListener('input', () => { limit = 40; render(); });
 $('#by').onclick = () => { grouped = !grouped; save(); render(); };
 $('#evonly').onclick = () => { evonly = !evonly; limit = 40; render(); };
 fillFilters();
