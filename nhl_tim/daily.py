@@ -126,8 +126,8 @@ def ingest_slate(con, date, force=True):
     return stats
 
 
-def ingest_goalies(con, date):
-    """Daily Faceoff is the only goalie source (by request). A game it does not list shows no goalie."""
+def ingest_goalies(con, date, source="dailyfaceoff"):
+    """Daily Faceoff is the default goalie source (by request). source="rotowire" is a one-off override."""
     import datetime as dt
     import zoneinfo
     from .sources import dailyfaceoff
@@ -150,6 +150,14 @@ def ingest_goalies(con, date):
         seen.add((eid, team))
         n += 1
 
+    if source == "rotowire":
+        for r in rotowire.fetch(date):
+            t, o = norm_team(r["team"]), norm_team(r["opp"])
+            eid = by_pair.get(frozenset((t, o)))
+            if eid and r["goalie"]:
+                st = {"Confirmed": "Confirmed", "Expected": "Likely"}.get(r["status"], "Unconfirmed")
+                put(eid, t, o, r["goalie"], st, 0, "RotoWire", "")
+        return n, unmatched
     try:
         for r in dailyfaceoff.starting_goalies(date, today):
             t, o = abbr.get(norm_name(r["team"])), abbr.get(norm_name(r["opp"]))
@@ -240,7 +248,7 @@ def update_lines(con):
         print("line update failed:", e)
 
 
-def update_daily(date):
+def update_daily(date, goalie_source="dailyfaceoff"):
     con = connect()
     update_current_stats(con)
     update_xg(con)
@@ -254,7 +262,7 @@ def update_daily(date):
     except Exception as e:  # game model degrades gracefully without it
         print("MoneyPuck team data failed:", e)
     s = ingest_slate(con, date)
-    n, um = ingest_goalies(con, date)
+    n, um = ingest_goalies(con, date, goalie_source)
     con.execute("INSERT OR REPLACE INTO meta VALUES('daily_updated', datetime('now'))")
     con.commit()
     return s, n, um

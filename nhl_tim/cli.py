@@ -12,6 +12,7 @@ def main():
     ap.add_argument("cmd", choices=["update_history", "validate", "update_power_play_units",
                                     "update_daily", "build_table", "build_site", "settle", "results"])
     ap.add_argument("--date", default=None, help="YYYY-MM-DD (ET); default today")
+    ap.add_argument("--goalies", default="dailyfaceoff", choices=["dailyfaceoff", "rotowire"], help="goalie source for this run")
     ap.add_argument("--force", action="store_true", help="refetch cached history")
     a = ap.parse_args()
     date = a.date or dt.datetime.now(zoneinfo.ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
@@ -24,7 +25,7 @@ def main():
         return
     if a.cmd == "update_daily":
         from .daily import update_daily
-        s, n, um = update_daily(date)
+        s, n, um = update_daily(date, a.goalies)
         from .db import connect as _c
         from .tracking import settle as _settle
         print('settled', _settle(_c()), 'earlier predictions')

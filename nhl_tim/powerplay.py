@@ -82,8 +82,17 @@ def update_lines(con=None):
     rows = dailyfaceoff.fetch_lines()
     con.execute("DELETE FROM player_line")
     n, unmatched = 0, []
+    from .daily import _find_goalie
+    con.execute("DELETE FROM team_goalies")
     for r in rows:
         team = norm_team(r["team"])
+        if r["group"] == "g":  # goalie depth chart: g1 = number one, g2 = backup, g3 = third
+            try:
+                depth = int(r["pos"].lstrip("g"))
+            except ValueError:
+                depth = 9
+            con.execute("INSERT OR REPLACE INTO team_goalies VALUES(?,?,?,?)", (team, r["name"], _find_goalie(con, team, r["name"]), depth))
+            continue
         pos = "D" if r["group"].startswith("d") else "F"
         pid = _match(con, team, r["name"], pos) or _prefer_forward(con, team, r["name"], pos)
         if pid is None:

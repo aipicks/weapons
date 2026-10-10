@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS pred_log(
   date TEXT, kind TEXT, key TEXT, start TEXT, pool INTEGER, name TEXT, team TEXT, opp TEXT, game TEXT, side TEXT, line REAL,
   price REAL, book TEXT, p REAL, p_mkt REAL, p_model REAL, ev REAL, label TEXT, extra TEXT,
   outcome REAL, actual REAL, settled INTEGER DEFAULT 0, PRIMARY KEY(date, kind, key));
+CREATE TABLE IF NOT EXISTS team_goalies(
+  team TEXT, name TEXT, nhl_id INTEGER, depth INTEGER, PRIMARY KEY(team, name));
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 """
 

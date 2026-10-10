@@ -212,9 +212,24 @@ def _safest_payload(con, date):
             "book": c["book"], "p": round(c["p"] * 100, 1), "mkt": round(c["market"] * 100, 1), "ev": round(c["ev"] * 100, 1), "label": c["label"]}
 
 
+def _backup(con, team, starter_id):
+    """The goalie most likely to start if the projected starter does not: next on the team's depth chart."""
+    rows = con.execute("SELECT * FROM team_goalies WHERE team=? AND (nhl_id IS NULL OR nhl_id != COALESCE(?, -1)) ORDER BY depth",
+                       (team, starter_id)).fetchall()
+    if not rows:
+        return None
+    b = rows[0]
+    gid = b["nhl_id"]
+    prev = _goalie_season(con, con.execute("SELECT * FROM goalie_season WHERE nhl_id=? AND season=?", (gid, PREV_SEASON)).fetchone()) if gid else None
+    cur = _goalie_season(con, con.execute("SELECT * FROM goalie_season WHERE nhl_id=? AND season=?", (gid, CUR_SEASON)).fetchone()) if gid else None
+    return {"name": b["name"], "depth": b["depth"], "p": prev, "c": cur}
+
+
 def _goalie_panel(con, date):
     """Every game's two starting goalies with status and last-season / this-season numbers."""
     out = []
+    from ..games import b2b_teams
+    b2b = b2b_teams(date)
     for g in con.execute("SELECT * FROM game WHERE date=? ORDER BY start_utc, event_id", (date,)):
         tm, _ = _et(g["start_utc"])
         sides = []
@@ -227,7 +242,8 @@ def _goalie_panel(con, date):
             prev = _goalie_season(con, con.execute("SELECT * FROM goalie_season WHERE nhl_id=? AND season=?", (gid, PREV_SEASON)).fetchone()) if gid else None
             cur = _goalie_season(con, con.execute("SELECT * FROM goalie_season WHERE nhl_id=? AND season=?", (gid, CUR_SEASON)).fetchone()) if gid else None
             sides.append({"team": team, "name": p["goalie_name"], "status": STATUS.get(p["status"], "Unconfirmed"),
-                          "p": prev, "c": cur, "fallback": bool(p["is_fallback"]), "note": p["note"] or ""})
+                          "p": prev, "c": cur, "fallback": bool(p["is_fallback"]), "note": p["note"] or "",
+                          "source": p["source"], "backup": _backup(con, team, gid), "b2b": team in b2b})
         out.append({"game": f"{g['away']} @ {g['home']}", "time": tm, "sides": sides})
     return out
 

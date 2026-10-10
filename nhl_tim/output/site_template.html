@@ -96,6 +96,7 @@ h1 span{color:var(--accent)}
 .gg .gm:first-child{border-top:0;padding-top:0}
 .gg .gh{font:600 14px var(--display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .gg .gs{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;line-height:1.5}
+.gg .gs.bk{font-size:12px;color:var(--muted)}
 .gg .gs .t{font:500 11px var(--mono);color:var(--muted);min-width:34px}
 .gcard{background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-top:10px;padding:10px 12px;font-size:13px}
 .ghead{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font:600 18px var(--display);letter-spacing:.04em;text-transform:uppercase}
@@ -403,7 +404,7 @@ if (window.innerWidth < 700) $('#gpanel').open = false;  // keep the phone view 
   const st = s => `<span class="tag ${STC[s]||'bad'}">${s}</span>`;
   const stat = (x, tag) => x ? `${tag} ${x.gaa.toFixed(2)} GAA ${rk(x.gr, x.gc)} ${String(x.sv.toFixed(3)).replace(/^0/,'')} SV% ${rk(x.svr, x.svc)} ${x.gp} GP` : `${tag} N/A`;
   $('#gg').innerHTML = (D.goalies||[]).map(g => `<div class="gm"><div class="gh">${g.game} · ${g.time.replace(' PM','')}</div>` + g.sides.map(s => s.name
-    ? `<div class="gs"><span class="t">${s.team}</span><b>${esc(s.name)}</b> ${st(s.status)}${s.fallback?' <span class="tag">RotoWire</span>':''}<span class="sub">${stat(s.p,'25–26')} ${sp0} ${stat(s.c,'26–27')}</span></div>`
+    ? `<div class="gs"><span class="t">${s.team}</span><b>${esc(s.name)}</b> ${st(s.status)}${s.fallback?' <span class="tag">RotoWire</span>':''}<span class="sub">${stat(s.p,'25–26')} ${sp0} ${stat(s.c,'26–27')}</span>${s.b2b?' <span class="tag bad">B2B</span>':''}</div>${s.backup?`<div class="gs bk"><span class="t"></span>Backup if he sits: <b>${esc(s.backup.name)}</b> <span class="sub">${stat(s.backup.p,'25–26')} ${sp0} ${stat(s.backup.c,'26–27')}</span></div>`:''}`
     : `<div class="gs"><span class="t">${s.team}</span>No goalie listed ${st('Unconfirmed')}</div>`).join('') + '</div>').join('');
 })();
 const dt = new Date(D.date + 'T12:00:00');

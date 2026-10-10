@@ -63,7 +63,7 @@ def fetch_lines():
     for t in first["sortedTeams"]:
         pp = _next_data(f"{BASE}/{t['slug']}/line-combinations")
         for p in pp["combinations"]["players"]:
-            if p["groupIdentifier"] in ("f1", "f2", "f3", "f4", "d1", "d2", "d3"):
+            if p["groupIdentifier"] in ("f1", "f2", "f3", "f4", "d1", "d2", "d3", "g"):
                 out.append({"team": t["shortName"], "name": p["name"], "group": p["groupIdentifier"],
                             "pos": p["positionIdentifier"]})
         time.sleep(0.5)
