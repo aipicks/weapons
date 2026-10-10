@@ -128,7 +128,7 @@ h1 span{color:var(--accent)}
     <h1>Pick <span>Board</span></h1>
     <div class="sub" id="sub"></div>
   </header>
-  <details class="gpanel" id="gpanel" open><summary>Today's starting goalies<small>Daily Faceoff</small></summary><div class="gg" id="gg"></div></details>
+  <details class="gpanel" id="gpanel"><summary>Today's starting goalies<small>Daily Faceoff</small></summary><div class="gg" id="gg"></div></details>
   <div class="bar">
     <div class="tabs views" id="views" role="tablist"></div>
     <div class="tabs" id="tabs" role="tablist"></div>
@@ -407,7 +407,6 @@ for (const id of ['f-q','f-team','f-game','f-pos','f-pp','f-line','f-side']) $('
 $('#by').onclick = () => { grouped = !grouped; save(); render(); };
 $('#evonly').onclick = () => { evonly = !evonly; limit = 40; render(); };
 fillFilters();
-if (window.innerWidth < 700) $('#gpanel').open = false;  // keep the phone view short; tap to expand
 (function(){
   const st = s => `<span class="tag ${STC[s]||'bad'}">${s}</span>`;
   const stat = (x, tag) => x ? `${tag} ${x.gaa.toFixed(2)} GAA ${rk(x.gr, x.gc)} ${String(x.sv.toFixed(3)).replace(/^0/,'')} SV% ${rk(x.svr, x.svc)} ${x.gp} GP` : `${tag} N/A`;
