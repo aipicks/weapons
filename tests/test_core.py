@@ -84,3 +84,19 @@ def test_team_season_insert_keeps_extra_columns():
     for mod in (daily, history):
         src = inspect.getsource(mod)
         assert "INSERT OR REPLACE INTO team_season VALUES" not in src
+
+
+def test_margin_distribution_and_puck_line():
+    from nhl_tim.games import margin_pmf, cover_prob
+    pmf = margin_pmf(3.1, 2.9)
+    assert abs(sum(pmf.values()) - 1) < 1e-4
+    assert pmf.get(0, 0) == 0                          # no ties after overtime / shootout
+    fav_cover, _ = cover_prob(pmf, -1.5)               # favorite must win by 2+
+    dog_cover, _ = cover_prob({-m: p for m, p in pmf.items()}, 1.5)
+    assert abs(fav_cover + dog_cover - 1) < 1e-4       # half-point lines: exactly one side covers
+    stronger = margin_pmf(3.6, 2.6)
+    assert cover_prob(stronger, -1.5)[0] > fav_cover   # stronger favorite covers more often
+    # league-average matchup should look like 2025-26: one-goal games about 43% of finals
+    avg = margin_pmf(3.05, 3.05)
+    one = sum(p for m, p in avg.items() if abs(m) == 1)
+    assert 0.38 < one < 0.48

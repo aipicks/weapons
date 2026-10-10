@@ -65,6 +65,8 @@ GAME = {
     "ot_skill": 0.5,       # how much better teams win overtime/shootout (0 = coin flip, 1 = proportional to goal share)
     "ot_goal": 0.55,       # chance a tied game ends on an overtime goal (adds one goal to the total)
     "market_w": 0.5,       # weight on the de-vigged market in the final probability (logit blend); 0.5 = model and market equal
+    # empty-net transitions fitted to the 1,312 regular-season games of 2025-26 (share of regulation margins that grow):
+    "en_1to2": 0.116, "en_2to3": 0.394, "en_3to4": 0.067,
     "bet_ev": 0.03, "lean_ev": 0.01,  # EV thresholds for BET / LEAN (below LEAN = PASS)
 }
 

@@ -70,6 +70,14 @@ def snapshot(con, date):
                  line=b["line"], price=b["price"], book=b["book"], p=b["p"], p_mkt=b["market"], p_model=b["model"], ev=b["ev"], label=tot["label"],
                  extra=json.dumps({"model_total": tot["model_total"]}))
             n += 1
+    for g in grows:
+        sp = g.get("spread")
+        if sp:
+            b = sp["best"]
+            _put(con, date, "spread_bet", g["eid"], g["start"], name=f"{b['team']} {b['line']:+g}", team=b["team"], game=f"{g['away']} @ {g['home']}",
+                 side=b["side"], line=b["line"], price=b["price"], book=b["book"], p=b["p"], p_mkt=b["market"], p_model=b["model"], ev=b["ev"],
+                 label=sp["label"])
+            n += 1
     bv = best_value_pick(grows)
     if bv:
         _put(con, date, "best_value", bv["eid"], next(g["start"] for g in grows if g["eid"] == bv["eid"]), name=bv["label_sel"], game=bv["game"],
@@ -113,6 +121,10 @@ def _result(kind, row, game, box):
     """(outcome, actual) for one logged prediction, or (None, None) if it cannot be settled / is void."""
     if kind == "ml_home":
         return (1.0 if game["hs"] > game["as"] else 0.0), game["hs"] - game["as"]
+    if kind == "spread_bet":
+        margin = (game["hs"] - game["as"]) * (1 if row["side"] == "home" else -1)
+        v = margin + row["line"]
+        return (0.5 if v == 0 else 1.0 if v > 0 else 0.0), game["hs"] - game["as"]
     if kind == "ml_bet":
         won = (game["hs"] > game["as"]) == (row["side"] == "home")
         return (1.0 if won else 0.0), game["hs"] - game["as"]
@@ -124,6 +136,10 @@ def _result(kind, row, game, box):
         return (1.0 if (over == (row["side"] == "Over")) else 0.0), t
     if kind == "best_value":
         info = json.loads(row["extra"] or "{}")
+        if info.get("market") == "Puck line":
+            margin = (game["hs"] - game["as"]) * (1 if row["side"] == "home" else -1)
+            v = margin + row["line"]
+            return (0.5 if v == 0 else 1.0 if v > 0 else 0.0), game["hs"] - game["as"]
         if info.get("market") == "Moneyline":
             home_pick = row["name"].startswith(row["game"].split(" @ ")[1]) if row["game"] else False
             won = (game["hs"] > game["as"]) == home_pick
@@ -159,7 +175,7 @@ def settle(con):
         boxes = {}
         for r in con.execute("SELECT * FROM pred_log WHERE date=? AND settled=0", (date,)).fetchall():
             row = dict(r)
-            if row["kind"] in ("ml_home", "ml_bet", "total_bet", "best_value"):
+            if row["kind"] in ("ml_home", "ml_bet", "total_bet", "spread_bet", "best_value"):
                 ev_id = row["key"]
             else:  # player rows: find the game from the "AWAY @ HOME" label
                 away, home = row["game"].split(" @ ")
@@ -251,6 +267,7 @@ def results(con):
                 "avg_p": round(sum(r["p"] for r in rows) / len(rows) * 100, 1) if rows else None}
     out["ml"] = {"all": bets("ml_bet"), "bet": bets("ml_bet", ("BET", "LEAN"))}
     out["total"] = {"all": bets("total_bet"), "bet": bets("total_bet", ("BET", "LEAN"))}
+    out["spread"] = {"all": bets("spread_bet"), "bet": bets("spread_bet", ("BET", "LEAN"))}
     out["best_value"] = bets("best_value")
     mlh = q("SELECT * FROM pred_log WHERE kind='ml_home' AND settled=1 AND outcome IS NOT NULL")
     bm, nm = _brier(mlh, "p_mkt")

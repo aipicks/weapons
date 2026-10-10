@@ -144,6 +144,42 @@ def league_constants(tm):
     return lg
 
 
+def margin_pmf(lamH, lamA):
+    """P(final home margin = m) including overtime/shootout (decided by one goal) and empty-net goals.
+    Regulation margins from independent Poissons; a tie goes to OT/SO and is won by one goal; then the empty-net transitions
+    fitted to 2025-26 (1->2 with 11.6%, 2->3 with 39.4%, 3->4 with 6.7%) stretch the leader's margin."""
+    pa, pb = pois(lamH), pois(lamA)
+    reg = {}
+    for a in range(MAXG):
+        for b in range(MAXG):
+            reg[a - b] = reg.get(a - b, 0.0) + pa[a] * pb[b]
+    share = lamH / (lamH + lamA)
+    ot_h = 0.5 + GAME["ot_skill"] * (share - 0.5)
+    out = {}
+
+    def add(m, p):
+        out[m] = out.get(m, 0.0) + p
+    step = {1: GAME["en_1to2"], 2: GAME["en_2to3"], 3: GAME["en_3to4"]}
+    for d, p in reg.items():
+        if d == 0:
+            add(1, p * ot_h)
+            add(-1, p * (1 - ot_h))
+            continue
+        k, sgn = abs(d), (1 if d > 0 else -1)
+        x = step.get(k, 0.0)
+        add(sgn * k, p * (1 - x))
+        if x:
+            add(sgn * (k + 1), p * x)
+    return out
+
+
+def cover_prob(pmf, line):
+    """(P(cover), P(push)) for a side whose handicap is `line` (e.g. -1.5 = must win by 2+, +1.5 = may lose by one)."""
+    win = sum(p for m, p in pmf.items() if m + line > 0)
+    push = sum(p for m, p in pmf.items() if m + line == 0)
+    return win, push
+
+
 def outcome_probs(lamA, lamB, total_lines):
     """P(A wins incl. OT/SO), plus a function P(over line) that accounts for overtime goals."""
     pa, pb = pois(lamA), pois(lamB)
@@ -188,6 +224,9 @@ def best_value_pick(rows):
         if g["total"]:
             for c in g["total"]["_all"]:
                 cands.append({**c, "game": f"{g['away']} @ {g['home']}", "eid": g["eid"], "market_name": "Total", "label_sel": f"{c['side']} {c['line']:g}"})
+        if g.get("spread"):
+            for c in g["spread"]["_all"]:
+                cands.append({**c, "game": f"{g['away']} @ {g['home']}", "eid": g["eid"], "market_name": "Puck line", "label_sel": f"{c['team']} {c['line']:+g}"})
     if not cands:
         return None
     best = max(cands, key=lambda c: c["ev"])
@@ -266,6 +305,30 @@ def build_game_rows(con, date):
                    "model_over": o_ref / (o_ref + u_ref), "model_total": lamH + lamA, "best": best, "label": _label(best["ev"]),
                    "fair_over": _fair2(ref_t["over_price"], ref_t["under_price"])}
 
+        # ---------- puck line ----------
+        pl = None
+        sp_rows = con.execute("SELECT * FROM odds_spread WHERE event_id=?", (eid,)).fetchall()
+        if sp_rows:
+            pmf = margin_pmf(lamH, lamA)
+            cands = []
+            for b in sp_rows:
+                fair_h = _fair2(b["home_price"], b["away_price"])
+                m_h, push_h = cover_prob(pmf, b["home_line"])
+                m_a, push_a = cover_prob({-m: p for m, p in pmf.items()}, b["away_line"])
+                model_h = m_h / (m_h + m_a) if (m_h + m_a) else 0.5
+                p_h = sigmoid(GAME["market_w"] * logit(fair_h) + (1 - GAME["market_w"]) * logit(model_h))
+                push = push_h
+                for side, team_, line, price, p_w, p_l, mk, md in (
+                        ("home", home, b["home_line"], b["home_price"], p_h * (1 - push), (1 - p_h) * (1 - push), fair_h, model_h),
+                        ("away", away, b["away_line"], b["away_price"], (1 - p_h) * (1 - push), p_h * (1 - push), 1 - fair_h, 1 - model_h)):
+                    cands.append({"side": side, "team": team_, "line": line, "price": price, "book": b["book"], "p": p_w,
+                                  "ev": p_w * (_dec(price) - 1) - p_l, "market": mk, "model": md})
+            best_sp = max(cands, key=lambda c: c["ev"])
+            ref_sp = next((b for b in sp_rows if b["book"] == MARKET_BOOK), sp_rows[0])
+            pl = {"_all": cands, "best": best_sp, "label": _label(best_sp["ev"]), "home_line": ref_sp["home_line"],
+                  "home_price": ref_sp["home_price"], "away_line": ref_sp["away_line"], "away_price": ref_sp["away_price"],
+                  "model_home_cover": cover_prob(pmf, ref_sp["home_line"])[0]}
+
         def stats(team):
             sp, sc = tm.get((team, PREV_SEASON), {}), tm.get((team, CUR_SEASON), {})
             def pct(sits):
@@ -288,7 +351,7 @@ def build_game_rows(con, date):
                     "gp_c": (sc.get("all") or {}).get("gp", 0)}
 
         out.append({"eid": eid, "start": g["start_utc"], "home": home, "away": away, "lamH": lamH, "lamA": lamA,
-                    "h": h_calc, "a": a_calc, "p_home_model": p_home_model, "reg": reg, "ml": ml, "total": tot,
+                    "h": h_calc, "a": a_calc, "p_home_model": p_home_model, "reg": reg, "ml": ml, "total": tot, "spread": pl,
                     "b2b": {"home": home in b2b, "away": away in b2b},
                     "goalie_home": gh, "goalie_away": ga_, "stats": {"home": stats(home), "away": stats(away)},
                     "books": [{"book": b["book"], "ml_home": b["ml_home"], "ml_away": b["ml_away"], "total": b["total"],

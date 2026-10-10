@@ -80,6 +80,15 @@ def ingest_slate(con, date, force=True):
                         (eid, b, g(ov, "lastUpdatedAt"), float(g(ov, "overUnder")), float(g(ov)),
                          float(g(un)) if g(un) else None, float(g(mh)) if g(mh) else None,
                          float(g(ma)) if g(ma) else None))
+        con.execute("DELETE FROM odds_spread WHERE event_id=?", (eid,))
+        sh, sa = o.get("points-home-game-sp-home"), o.get("points-away-game-sp-away")  # full-game puck line
+        for b in ALLOWED_BOOKS:
+            hb = (sh or {}).get("byBookmaker", {}).get(b, {})
+            ab = (sa or {}).get("byBookmaker", {}).get(b, {})
+            if hb.get("odds") is None or ab.get("odds") is None or hb.get("spread") is None or ab.get("spread") is None:
+                continue
+            con.execute("INSERT OR REPLACE INTO odds_spread VALUES(?,?,?,?,?,?,?)",
+                        (eid, b, hb.get("lastUpdatedAt"), float(hb["spread"]), float(hb["odds"]), float(ab["spread"]), float(ab["odds"])))
         con.execute("DELETE FROM odds_atg WHERE event_id=?", (eid,))
         con.execute("DELETE FROM odds_sog WHERE event_id=?", (eid,))
         for oid, x in o.items():  # player shots-on-goal over/under lines

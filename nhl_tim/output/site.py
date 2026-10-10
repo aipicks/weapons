@@ -191,6 +191,10 @@ def _games_payload(con, date):
             "ml": None if not ml else {"fair_h": round(ml["fair_home"] * 100, 1), "model_h": round(ml["model_home"] * 100, 1),
                                        "final_h": round(ml["final_home"] * 100, 1), "best": side(ml["best"]), "label": ml["label"],
                                        "cands": [side(c) for c in ml["cands"]]},
+            "spread": None if not g.get("spread") else {
+                "best": side(g["spread"]["best"]), "label": g["spread"]["label"], "cover_h": round(g["spread"]["model_home_cover"] * 100, 1),
+                "home": f"{g['home']} {g['spread']['home_line']:+g} ({fmt_american(g['spread']['home_price'])})",
+                "away": f"{g['away']} {g['spread']['away_line']:+g} ({fmt_american(g['spread']['away_price'])})"},
             "total": None if not tot else {"line": tot["line"], "model_over": round(tot["model_over"] * 100, 1),
                                            "fair_over": round(tot["fair_over"] * 100, 1), "best": side(tot["best"]), "label": tot["label"]},
             "books": [{"b": b["book"], "mh": fmt_american(b["ml_home"]) if b["ml_home"] is not None else None,

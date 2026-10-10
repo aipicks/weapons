@@ -160,6 +160,7 @@ h1 span{color:var(--accent)}
 <p><b>2. Goals.</b> lambda = xG x league goals-per-xG anchor (last season's real scoring, because 5v5/PP/PK xG leaves out empty-net and 3-on-3) x opposing goalie factor x home ice (home x1.035, away x0.975) x back-to-back (x0.97 for, x1.03 against). Goalie factor = 1 + shrunk (goals allowed - xG faced) / xG faced, capped at +/-12%, with small samples shrunk by shots / (shots + 900) and damped for Likely (x0.8) or Unconfirmed (x0.5) starters. Goals are Poisson.</p>
 <p><b>3. Probabilities.</b> P(A wins) = P(A scores more) + P(tie) x overtime share, where overtime share = 0.5 + 0.5 x (A's goal share - 0.5). The total adds one goal when a tied game ends on an overtime goal (55% of ties). P(over) is read off that distribution at each book's line.</p>
 <p><b>4. Final probability and EV.</b> logit(final) = 0.5 x logit(de-vigged market) + 0.5 x logit(model): the model and the market count equally. EV = final x payout - (1 - final), at the best price across books (totals compare each book at its own line).</p>
+<p><b>Puck line.</b> The margin distribution is regulation (Poisson goal difference), a tie won by one goal in overtime or the shootout, and empty-net transitions fitted to 2025-26 (a 1-goal lead grows to 2 about 12% of the time, 2 to 3 about 39%, 3 to 4 about 7%). Cover probability is read from that margin at each book's line, then blended 50/50 with the de-vigged market.</p>
 <p><b>5. Calls.</b> BET = EV +3% or better, LEAN = +1% to +3%, PASS = below. Weights are starting priors, not fitted. Nothing here has been tested against results, and these markets are very efficient, so most games will be PASS.</p></details></template>
 
   <div class="legend">
@@ -259,17 +260,17 @@ const BOOKSHORT = b => b.replace('espnbet','ESPN').replace('draftkings','DK').re
 function gcard(g){
   const m = g.ml, t = g.total, sp = '<span class="sep">|</span>';
   const gk = (x,tm) => x ? `${tm} ${esc(x.name)} <span class="tag ${STC[x.status]}">${x.status}</span>` : `${tm} no goalie listed`;
-  const bet = (title, b, lbl) => b ? `<div class="bet ${lab(lbl)}"><span class="mk">${title}</span><b>${b.team?esc(b.team)+' ML':b.side+' '+b.line} ${b.price}</b> <small>${BOOKSHORT(b.book)}</small><span class="bp">our ${b.p}% vs market ${b.market}% ${sp} EV <b>${evs(b.ev)}</b> <span class="tag ${lab(lbl)}">${lbl}</span></span></div>` : '';
+  const bet = (title, b, lbl) => b ? `<div class="bet ${lab(lbl)}"><span class="mk">${title}</span><b>${b.team?esc(b.team)+(b.line!=null&&b.side!=='Over'&&b.side!=='Under'?' '+(b.line>0?'+':'')+b.line:' ML'):b.side+' '+b.line} ${b.price}</b> <small>${BOOKSHORT(b.book)}</small><span class="bp">our ${b.p}% vs market ${b.market}% ${sp} EV <b>${evs(b.ev)}</b> <span class="tag ${lab(lbl)}">${lbl}</span></span></div>` : '';
   const h = g.st.home, a = g.st.away;
   const row = (l, ax, hx) => `<tr><td>${l}</td><td>${ax}</td><td>${hx}</td></tr>`;
   return `<article class="gcard">
     <div class="ghead"><b>${g.away} @ ${g.home}</b><span>${g.time.replace(' PM','')}</span>${g.b2b.away?`<span class="tag bad">${g.away} B2B</span>`:''}${g.b2b.home?`<span class="tag bad">${g.home} B2B</span>`:''}</div>
     <div class="gg2">${gk(g.ga,g.away)}<br>${gk(g.gh,g.home)}</div>
     <div class="gm2">
-      <div><h4>Market (FanDuel)</h4><div>ML ${g.away} <b>${g.mkt.ml_a||'?'}</b> / ${g.home} <b>${g.mkt.ml_h||'?'}</b></div><div>Total <b>${g.mkt.line??'?'}</b> (O ${g.mkt.over||'?'} / U ${g.mkt.under||'?'})</div></div>
+      <div><h4>Market (FanDuel)</h4><div>ML ${g.away} <b>${g.mkt.ml_a||'?'}</b> / ${g.home} <b>${g.mkt.ml_h||'?'}</b></div>${g.spread?`<div>Puck line ${g.spread.away} / ${g.spread.home}</div>`:''}<div>Total <b>${g.mkt.line??'?'}</b> (O ${g.mkt.over||'?'} / U ${g.mkt.under||'?'})</div></div>
       <div><h4>Our projection</h4><div>${g.away} <b>${g.lamA.toFixed(2)}</b> – ${g.home} <b>${g.lamH.toFixed(2)}</b> goals (total ${g.tot.toFixed(2)})</div>${m?`<div>Win: ${g.away} ${(100-m.model_h).toFixed(1)}% / ${g.home} ${m.model_h.toFixed(1)}% <small>(market ${(100-m.fair_h).toFixed(1)}% / ${m.fair_h.toFixed(1)}%)</small></div>`:''}</div>
     </div>
-    ${bet('MONEYLINE', m&&m.best, m&&m.label)}${bet('TOTAL', t&&t.best, t&&t.label)}
+    ${bet('MONEYLINE', m&&m.best, m&&m.label)}${g.spread ? bet('PUCK LINE', g.spread.best, g.spread.label) : ''}${bet('TOTAL', t&&t.best, t&&t.label)}
     <table class="cmp"><tr><th>25–26 → 26–27</th><th>${g.away}</th><th>${g.home}</th></tr>
       ${row('xG share (all)', stat(a.xgp,a.xgc,1,'%'), stat(h.xgp,h.xgc,1,'%'))}
       ${row('xG share 5v5', stat(a.ev_xgp,a.ev_xgc,1,'%'), stat(h.ev_xgp,h.ev_xgc,1,'%'))}
@@ -289,11 +290,12 @@ function renderGames(){
   const picks = [];
   for (const g of D.games) {
     if (g.ml && g.ml.label !== 'PASS') picks.push({g, mk:'Moneyline', b:g.ml.best, l:g.ml.label});
+    if (g.spread && g.spread.label !== 'PASS') picks.push({g, mk:'Puck line', b:g.spread.best, l:g.spread.label});
     if (g.total && g.total.label !== 'PASS') picks.push({g, mk:'Total', b:g.total.best, l:g.total.label});
   }
   picks.sort((x,y) => y.b.ev - x.b.ev);
   const top = picks.length
-    ? `<div class="gtop"><h3>Best bets today</h3>${picks.map(p=>`<div class="gp"><span class="tag ${lab(p.l)}">${p.l}</span> <b>${p.g.away} @ ${p.g.home}</b> ${p.mk}: ${p.b.team?esc(p.b.team)+' ML':p.b.side+' '+p.b.line} ${p.b.price} <small>${BOOKSHORT(p.b.book)}</small> <span class="sep">|</span> EV <b>${evs(p.b.ev)}</b></div>`).join('')}</div>`
+    ? `<div class="gtop"><h3>Best bets today</h3>${picks.map(p=>`<div class="gp"><span class="tag ${lab(p.l)}">${p.l}</span> <b>${p.g.away} @ ${p.g.home}</b> ${p.mk}: ${p.b.team?esc(p.b.team)+(p.mk==='Puck line'?' '+(p.b.line>0?'+':'')+p.b.line:' ML'):p.b.side+' '+p.b.line} ${p.b.price} <small>${BOOKSHORT(p.b.book)}</small> <span class="sep">|</span> EV <b>${evs(p.b.ev)}</b></div>`).join('')}</div>`
     : '<div class="gtop"><h3>Best bets today</h3><div class="gp">No game clears the +1% EV bar today.</div></div>';
   const bv = D.safe;
   const sf = bv ? `<div class="gtop safe ${lab(bv.label)}"><h3>${bv.label==='BET' ? 'Best value of the day' : bv.label==='LEAN' ? 'Best value of the day (small edge)' : 'No bet clears +3% EV: best available value'}</h3><div class="gp"><b>${esc(bv.game)}</b> ${bv.market}: <b>${esc(bv.sel)} ${bv.price}</b> <small>${BOOKSHORT(bv.book)}</small><br>our <b>${bv.p}%</b> vs market ${bv.mkt}% <span class="sep">|</span> EV <b>${evs(bv.ev)}</b> <span class="tag ${lab(bv.label)}">${bv.label}</span></div><small class="hint">Highest expected value across every moneyline and total at the five books, however likely it is to win. Under +3% EV is not a real edge; treat it as a pass or a very small play.</small></div>` : '';
@@ -323,7 +325,7 @@ function renderResults(){
     <table class="cmp"><tr><th>Pool</th><th>Days</th><th>Top pick scored</th><th>Predicted</th><th>All players scored</th></tr>${tim}</table></div>
   <div class="gcard"><div class="ghead"><b>Game bets</b></div>
     <table class="cmp"><tr><th>Bets ($1 each)</th><th>N</th><th>Won</th><th>Avg our %</th><th>Avg EV</th><th>Profit</th></tr>
-      ${bet('Moneyline, all best', R.ml.all)}${bet('Moneyline, BET+LEAN', R.ml.bet)}${bet('Total, all best', R.total.all)}${bet('Total, BET+LEAN', R.total.bet)}${bet('Best value pick', R.best_value)}</table>
+      ${bet('Moneyline, all best', R.ml.all)}${bet('Moneyline, BET+LEAN', R.ml.bet)}${bet('Puck line, all best', R.spread.all)}${bet('Puck line, BET+LEAN', R.spread.bet)}${bet('Total, all best', R.total.all)}${bet('Total, BET+LEAN', R.total.bet)}${bet('Best value pick', R.best_value)}</table>
     <div class="gg2">Home-win Brier (${R.ml_brier.n} games): raw model <b>${num(R.ml_brier.model_raw)}</b> · 50/50 blend <b>${num(R.ml_brier.blend)}</b> · market <b>${num(R.ml_brier.market)}</b></div></div>
   <div class="gcard"><div class="ghead"><b>Shots on goal</b></div>
     <div class="gg2">${R.sog.n} lines · best side hit ${R.sog.hit==null?'?':R.sog.hit+'%'} vs our ${R.sog.avg_p==null?'?':R.sog.avg_p+'%'} · $1 on every best side ${money(R.sog.profit_all)} · only +EV sides (${R.sog.pos_n}) ${money(R.sog.pos_profit)}</div></div>
