@@ -73,7 +73,7 @@ def test_only_approved_books_allowed():
     assert set(ALLOWED_BOOKS) == {"fanduel", "draftkings", "betmgm", "bovada", "caesars"}  # ESPN BET removed on request
     from nhl_tim.db import connect
     con = connect()
-    for tbl in ("odds_game", "odds_atg", "odds_sog"):
+    for tbl in ("odds_game", "odds_atg", "odds_sog", "odds_spread"):
         assert not con.execute(f"SELECT 1 FROM {tbl} WHERE book NOT IN ({','.join('?' * len(ALLOWED_BOOKS))}) LIMIT 1", ALLOWED_BOOKS).fetchone()
 
 

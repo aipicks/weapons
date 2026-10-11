@@ -74,7 +74,7 @@ def connect():
         if c_ not in tcols:
             con.execute(f'ALTER TABLE team_season ADD COLUMN {c_} REAL')
     ph = ','.join('?' * len(ALLOWED_BOOKS))  # drop any odds from books we do not use
-    for tbl in ('odds_game', 'odds_atg', 'odds_sog'):
+    for tbl in ('odds_game', 'odds_atg', 'odds_sog', 'odds_spread'):
         con.execute(f'DELETE FROM {tbl} WHERE book NOT IN ({ph})', ALLOWED_BOOKS)
     con.commit()  # do not leave a write transaction open: other connections would hit 'database is locked'
     return con
