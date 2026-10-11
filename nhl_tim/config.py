@@ -70,5 +70,5 @@ GAME = {
     "bet_ev": 0.03, "lean_ev": 0.01,  # EV thresholds for BET / LEAN (below LEAN = PASS)
 }
 
-# Only these five sportsbooks are ever used (stored, displayed, or priced). Everything else is dropped at ingest.
-ALLOWED_BOOKS = ("fanduel", "draftkings", "betmgm", "espnbet", "bovada")
+# Only these six sportsbooks are ever used (stored, displayed, or priced). Everything else (Unibet, PointsBet, ...) is dropped at ingest.
+ALLOWED_BOOKS = ("fanduel", "draftkings", "betmgm", "espnbet", "bovada", "caesars")

@@ -234,7 +234,7 @@ function sogRow(r){
   const [ppt, ppc] = PP[r.pp];
   const sp = '<span class="sep">|</span>';
   const why = r.why.map(([p,t]) => `<li class="${p}">${esc(t)}</li>`).join('');
-  const books = r.books.map(b => `${b.b.replace('espnbet','ESPN').replace('draftkings','DK').replace('fanduel','FD').replace('betmgm','MGM').replace('bovada','Bov')} ${b.l} (O ${b.o} / U ${b.u})`).join(' · ');
+  const books = r.books.map(b => `${b.b.replace('espnbet','ESPN').replace('draftkings','DK').replace('fanduel','FD').replace('betmgm','MGM').replace('bovada','Bov').replace('caesars','CZR')} ${b.l} (O ${b.o} / U ${b.u})`).join(' · ');
   const s = (x, y) => x ? `${x.avg.toFixed(2)}/G (${x.gp} GP)` : 'N/A';
   return `<article class="row t-${r.tier}">
     <div class="head">
@@ -256,7 +256,7 @@ function sogRow(r){
 const lab = l => ({BET:'good', LEAN:'warn', PASS:''}[l]);
 const evs = v => (v>0?'+':'')+v.toFixed(1)+'%';
 const stat = (a,b,d=1,suf='') => `${a==null?'?':a.toFixed(d)+suf} → ${b==null?'?':b.toFixed(d)+suf}`;
-const BOOKSHORT = b => b.replace('espnbet','ESPN').replace('draftkings','DK').replace('fanduel','FD').replace('betmgm','MGM').replace('bovada','Bov').replace('caesars','CZR');
+const BOOKSHORT = b => b.replace('espnbet','ESPN').replace('draftkings','DK').replace('fanduel','FD').replace('betmgm','MGM').replace('bovada','Bov').replace('caesars','CZR').replace('caesars','CZR');
 function gcard(g){
   const m = g.ml, t = g.total, sp = '<span class="sep">|</span>';
   const gk = (x,tm) => x ? `${tm} ${esc(x.name)} <span class="tag ${STC[x.status]}">${x.status}</span>` : `${tm} no goalie listed`;

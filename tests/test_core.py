@@ -68,13 +68,13 @@ def test_game_outcome_probs():
     assert over(5.5)[0] > over(6.5)[0]               # higher line, lower P(over)
 
 
-def test_only_five_books_allowed():
+def test_only_approved_books_allowed():
     from nhl_tim.config import ALLOWED_BOOKS
-    assert set(ALLOWED_BOOKS) == {"fanduel", "draftkings", "betmgm", "espnbet", "bovada"}
+    assert set(ALLOWED_BOOKS) == {"fanduel", "draftkings", "betmgm", "espnbet", "bovada", "caesars"}
     from nhl_tim.db import connect
     con = connect()
     for tbl in ("odds_game", "odds_atg", "odds_sog"):
-        assert not con.execute(f"SELECT 1 FROM {tbl} WHERE book NOT IN ({','.join('?' * 5)}) LIMIT 1", ALLOWED_BOOKS).fetchone()
+        assert not con.execute(f"SELECT 1 FROM {tbl} WHERE book NOT IN ({','.join('?' * len(ALLOWED_BOOKS))}) LIMIT 1", ALLOWED_BOOKS).fetchone()
 
 
 def test_team_season_insert_keeps_extra_columns():
