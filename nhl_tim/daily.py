@@ -76,6 +76,8 @@ def ingest_slate(con, date, force=True):
                 return (x or {}).get("byBookmaker", {}).get(b, {}).get(k)
             if g(ov) is None or g(ov, "overUnder") is None:
                 continue
+            if g(ov, "available") is False or g(un, "available") is False:
+                continue  # listed but not bettable
             con.execute("INSERT OR REPLACE INTO odds_game VALUES(?,?,?,?,?,?,?,?)",
                         (eid, b, g(ov, "lastUpdatedAt"), float(g(ov, "overUnder")), float(g(ov)),
                          float(g(un)) if g(un) else None, float(g(mh)) if g(mh) else None,
@@ -86,6 +88,8 @@ def ingest_slate(con, date, force=True):
             hb = (sh or {}).get("byBookmaker", {}).get(b, {})
             ab = (sa or {}).get("byBookmaker", {}).get(b, {})
             if hb.get("odds") is None or ab.get("odds") is None or hb.get("spread") is None or ab.get("spread") is None:
+                continue
+            if not hb.get("available", True) or not ab.get("available", True):
                 continue
             con.execute("INSERT OR REPLACE INTO odds_spread VALUES(?,?,?,?,?,?,?)",
                         (eid, b, hb.get("lastUpdatedAt"), float(hb["spread"]), float(hb["odds"]), float(ab["spread"]), float(ab["odds"])))
@@ -107,6 +111,8 @@ def ingest_slate(con, date, force=True):
                 ub = under.get(b, {})
                 if bo.get("odds") is None or bo.get("overUnder") is None or ub.get("odds") is None:
                     continue
+                if not bo.get("available", True) or not ub.get("available", True):
+                    continue  # line is listed but cannot be bet (e.g. the book does not offer the under)
                 con.execute("INSERT OR REPLACE INTO odds_sog VALUES(?,?,?,?,?,?,?,?,?,?)",
                             (eid, pid_, pinfo["name"], team_, opp_, b, float(bo["overUnder"]),
                              float(bo["odds"]), float(ub["odds"]), bo.get("lastUpdatedAt")))
