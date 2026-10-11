@@ -70,7 +70,7 @@ def test_game_outcome_probs():
 
 def test_only_approved_books_allowed():
     from nhl_tim.config import ALLOWED_BOOKS
-    assert set(ALLOWED_BOOKS) == {"fanduel", "draftkings", "betmgm", "espnbet", "bovada", "caesars"}
+    assert set(ALLOWED_BOOKS) == {"fanduel", "draftkings", "betmgm", "bovada", "caesars"}  # ESPN BET removed on request
     from nhl_tim.db import connect
     con = connect()
     for tbl in ("odds_game", "odds_atg", "odds_sog"):
