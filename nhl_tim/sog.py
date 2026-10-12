@@ -9,6 +9,7 @@ import statistics
 from .config import CUR_SEASON, MARKET_BOOK, PREV_SEASON, SOG
 from .model import logit, sigmoid
 from .odds_math import american_to_prob, implied_team_totals
+from .posshots import current_defense
 from .sources import nhl_api
 
 
@@ -89,6 +90,10 @@ def build_sog_rows(con, date):
     teams_cur = {r["team"]: r for r in con.execute("SELECT * FROM team_season WHERE season=?", (CUR_SEASON,))}
     sa_all = [t["sa_pg"] for t in teams_prev.values() if t["sa_pg"]]
     league_sa = sum(sa_all) / len(sa_all) if sa_all else 30.0
+    pos_prev = {r["team"]: r for r in con.execute("SELECT * FROM team_pos_sa WHERE season=?", (PREV_SEASON,))}
+    pos_cur = {r["team"]: r for r in con.execute("SELECT * FROM team_pos_sa WHERE season=?", (CUR_SEASON,))}
+    lg_pos = {k: (sum(t[f"sa_{k}_pg"] for t in pos_prev.values()) / len(pos_prev)) if pos_prev else None for k in ("f", "d")}
+    cur_def = current_defense(con)
     pk_prev = [r[0] for r in con.execute("SELECT pk_toi_pg FROM team_pk_toi WHERE season=?", (PREV_SEASON,))]
     league_pk = sum(pk_prev) / len(pk_prev) if pk_prev else None
 
@@ -122,6 +127,13 @@ def build_sog_rows(con, date):
         wo = (oc["gp"] / (oc["gp"] + SOG["opp_k"])) if oc and oc["sa_pg"] else 0.0
         sa_eff = (1 - wo) * op["sa_pg"] + wo * oc["sa_pg"] if op and op["sa_pg"] and wo else (op["sa_pg"] if op and op["sa_pg"] else league_sa)
         f_opp = (sa_eff / league_sa) ** SOG["opp_exp"]
+        # shots the opponent allows to this player's position group (forwards or defensemen) replace the all-shooter rate
+        grp = "d" if p["pos"] == "D" else "f"
+        pp_, pc_ = pos_prev.get(opp), pos_cur.get(opp)
+        if pp_ and lg_pos.get(grp):
+            wpos = pc_["gp"] / (pc_["gp"] + SOG["opp_k"]) if pc_ else 0.0
+            sa_pos = (1 - wpos) * pp_[f"sa_{grp}_pg"] + wpos * pc_[f"sa_{grp}_pg"] if pc_ else pp_[f"sa_{grp}_pg"]
+            f_opp = (sa_pos / lg_pos[grp]) ** SOG["opp_exp"]
 
         toi_p = _one(con, "SELECT toi_pg FROM player_toi WHERE nhl_id=? AND season=?", pid, PREV_SEASON)
         toi_c = _one(con, "SELECT toi_pg FROM player_toi WHERE nhl_id=? AND season=?", pid, CUR_SEASON)
@@ -217,6 +229,7 @@ def build_sog_rows(con, date):
             "pp_cur": _one(con, "SELECT pp_toi_pg FROM player_pp_toi WHERE nhl_id=? AND season=?", pid, CUR_SEASON),
             "mu_market": q["mu_market"], "opp_prev": op, "opp_cur": oc, "sa_eff": sa_eff, "xg_t": xg_t,
             "pp_unit": _one(con, "SELECT unit FROM pp_unit WHERE nhl_id=?", pid) or 0,
+            "pos_grp": grp.upper(), "opp_pos_prev": pp_, "opp_pos_cur": pc_, "opp_def_cur": cur_def.get(opp),
             "reasons": [(c, t) for _, c, t in reasons[:5]],
         })
     out.sort(key=lambda r: -r["ev"])

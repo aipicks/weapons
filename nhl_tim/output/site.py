@@ -134,6 +134,10 @@ def _sog_payload(con, date):
         tm, _ = _et(r["start"])
         n_teams = con.execute("SELECT COUNT(*) FROM team_season WHERE season=?", (CUR_SEASON,)).fetchone()[0]
         op, oc = r["opp_prev"], r["opp_cur"]
+        def possa(t, grp):
+            k = grp.lower()
+            return {"sa": round(t[f"sa_{k}_pg"], 1), "rank": int(t[f"{k}_rank"]), "gp": t["gp"],
+                    "c": team_color(int(t[f"{k}_rank"]))} if t else None
         def sa(t, n=32):
             return {"sa": round(t["sa_pg"], 1), "rank": int(t["sa_rank"]), "c": team_color(int(t["sa_rank"]), n),
                     "gp": t["gp"]} if t and t["sa_pg"] else None
@@ -154,6 +158,10 @@ def _sog_payload(con, date):
             "toi": {"p": _mmss(r["toi_prev"]), "c": _mmss(r["toi_cur"])},
             "ppt": {"p": _mmss(r["pp_prev"]), "c": _mmss(r["pp_cur"])},
             "opp_p": sa(op), "opp_c": sa(oc, n_teams),
+            "pos_grp": r["pos_grp"], "pos_p": possa(r["opp_pos_prev"], r["pos_grp"]), "pos_c": possa(r["opp_pos_cur"], r["pos_grp"]),
+            "def_c": ({"rank": r["opp_def_cur"]["rank"], "c": team_color(r["opp_def_cur"]["rank"], n_teams), "gp": r["opp_def_cur"]["gp"],
+                       "xga": round(r["opp_def_cur"]["xga"], 2), "ga": round(r["opp_def_cur"]["ga"], 2),
+                       "sa": round(r["opp_def_cur"]["sa"], 1)} if r.get("opp_def_cur") else None),
             "opp_pre": {"rank": PRESEASON_D[r["opp"]], "tie": r["opp"] in PRESEASON_D_TIES, "c": team_color(PRESEASON_D[r["opp"]])},
             "why": [[c, t] for c, t in r["reasons"]],
         })

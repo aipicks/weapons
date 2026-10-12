@@ -1,4 +1,5 @@
 """Daily refresh: current-season skater/goalie stats, games+odds (SGO), projected goalies (RotoWire)."""
+from .posshots import update_pos_shots
 from .config import ALLOWED_BOOKS, CUR_SEASON
 from .db import connect
 from .normalize import norm_name, norm_team
@@ -271,6 +272,10 @@ def update_daily(date, goalie_source="dailyfaceoff"):
     update_pp_time(con)
     update_team_stats(con)
     update_team_shots(con)
+    try:
+        update_pos_shots(con)  # first run fetches a season of boxscores (slow); later runs only new games
+    except Exception as e:
+        print("Shots against by position failed:", e)
     update_lines(con)
     try:
         update_team_mp(con)

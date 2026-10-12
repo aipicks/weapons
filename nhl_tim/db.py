@@ -11,6 +11,9 @@ CREATE TABLE IF NOT EXISTS player_season(
 CREATE TABLE IF NOT EXISTS team_season(
   team TEXT, season INTEGER, gp INTEGER, ga_pg REAL, ga_rank INTEGER,
   PRIMARY KEY(team, season));
+CREATE TABLE IF NOT EXISTS team_pos_sa(
+  team TEXT, season INTEGER, gp INTEGER, sa_f_pg REAL, sa_d_pg REAL, f_rank INTEGER, d_rank INTEGER,
+  PRIMARY KEY(team, season));
 CREATE TABLE IF NOT EXISTS goalie_season(
   nhl_id INTEGER, season INTEGER, name TEXT, team TEXT, gp INTEGER, starts INTEGER,
   gaa REAL, sv_pct REAL, qualified INTEGER, gaa_rank INTEGER, sv_rank INTEGER,
