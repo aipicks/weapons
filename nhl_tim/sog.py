@@ -86,6 +86,10 @@ def build_sog_rows(con, date):
            JOIN player_toi t ON t.nhl_id=s.nhl_id AND t.season=s.season
            WHERE s.season=? AND s.gp>=40 AND t.toi_pg>=(CASE p.pos WHEN 'D' THEN 1080 ELSE 840 END)
            GROUP BY p.pos""", (PREV_SEASON,))}
+    att_all = {(r["nhl_id"], r["season"]): r for r in con.execute("SELECT * FROM player_att")}
+    pos_att = {r["pos"]: (r["a"], r["o"]) for r in con.execute(
+        """SELECT p.pos pos, SUM(a.att) * 1.0 / SUM(a.gp) a, SUM(a.sog) * 1.0 / SUM(a.att) o FROM player_att a
+           JOIN player p USING(nhl_id) WHERE a.season=? AND a.gp>=40 GROUP BY p.pos""", (PREV_SEASON,))}
     teams_prev = {r["team"]: r for r in con.execute("SELECT * FROM team_season WHERE season=?", (PREV_SEASON,))}
     teams_cur = {r["team"]: r for r in con.execute("SELECT * FROM team_season WHERE season=?", (CUR_SEASON,))}
     sa_all = [t["sa_pg"] for t in teams_prev.values() if t["sa_pg"]]
@@ -125,6 +129,24 @@ def build_sog_rows(con, date):
         recent = (cur_s + prev_s)[:10]
         form = sum(recent) / len(recent) if recent else season_rate
         mu0 = (1 - SOG["form_w"]) * season_rate + SOG["form_w"] * form
+
+        # shot attempts: attempts per game (last season shrunk to the position average, this season ramped in like
+        # shots) times an on-target rate regressed toward the position average, blended with the shots-based rate
+        att = None
+        a_prev, a_cur = att_all.get((pid, PREV_SEASON)), att_all.get((pid, CUR_SEASON))
+        if pos_att.get(p["pos"]) and (a_prev or a_cur):
+            pa, po = pos_att[p["pos"]]
+            ka = SOG["att_prior_games"]
+            prev_a = (a_prev["att"] + pa * ka) / (a_prev["gp"] + ka) if a_prev else pa
+            gc = a_cur["gp"] if a_cur else 0
+            wca = gc / (gc + SOG["cur_k"])
+            att_rate = (1 - wca) * prev_a + wca * (a_cur["att"] / gc) if gc else prev_a
+            tot_a = sum(x["att"] for x in (a_prev, a_cur) if x)
+            tot_s = sum(x["sog"] for x in (a_prev, a_cur) if x)
+            ot = (tot_s + po * SOG["ot_k"]) / (tot_a + SOG["ot_k"])
+            mu_att = att_rate * ot
+            mu0 = (1 - SOG["att_w"]) * mu0 + SOG["att_w"] * mu_att
+            att = {"rate": att_rate, "ot": ot, "mu": mu_att, "prev": a_prev, "cur": a_cur}
 
         oc, op = teams_cur.get(opp), teams_prev.get(opp)
         wo = (oc["gp"] / (oc["gp"] + SOG["opp_k"])) if oc and oc["sa_pg"] else 0.0
@@ -166,7 +188,7 @@ def build_sog_rows(con, date):
         pre.append(dict(eid=eid, g=g, pid=pid, p=p, team=team, opp=opp, books=books, ref=ref, mu=mu,
                         fair_over=statistics.median(fairs), cur_s=cur_s, prev_s=prev_s, recent=recent, form=form,
                         season_rate=season_rate, toi_c=toi_c, toi_p=toi_p, pp_p=pp_p, oc=oc, op=op, wo=wo,
-                        sa_eff=sa_eff, xg_t=xg_t))
+                        sa_eff=sa_eff, xg_t=xg_t, att=att))
 
     # the model's own probabilities are compared with the market's as-is (no forced level match); the shots the
     # market implies at each line are kept for display and for monitoring bias
@@ -199,6 +221,10 @@ def build_sog_rows(con, date):
         # --- reasons ---
         reasons = []
         edge_mu = mu - line
+        if q["att"]:
+            ea = q["att"]["mu"] - line
+            reasons.append((abs(ea), "p" if (ea > 0) == (side == "Over") else "n",
+                            f"Shot attempts {q['att']['rate']:.1f}/G x {q['att']['ot']*100:.0f}% on target = {q['att']['mu']:.1f} shots"))
         reasons.append((abs(edge_mu), "p" if (edge_mu > 0) == (side == "Over") else "n",
                         f"Projection {mu:.1f} vs line {line:g}"))
         if oc or op:
@@ -232,7 +258,7 @@ def build_sog_rows(con, date):
             "pp_cur": _one(con, "SELECT pp_toi_pg FROM player_pp_toi WHERE nhl_id=? AND season=?", pid, CUR_SEASON),
             "mu_market": q["mu_market"], "opp_prev": op, "opp_cur": oc, "sa_eff": sa_eff, "xg_t": xg_t,
             "pp_unit": _one(con, "SELECT unit FROM pp_unit WHERE nhl_id=?", pid) or 0,
-            "pos_grp": grp.upper(), "opp_pos_prev": pp_, "opp_pos_cur": pc_, "opp_def_cur": cur_def.get(opp),
+            "att": q["att"], "pos_grp": grp.upper(), "opp_pos_prev": pp_, "opp_pos_cur": pc_, "opp_def_cur": cur_def.get(opp),
             "reasons": [(c, t) for _, c, t in reasons[:5]],
         })
     out.sort(key=lambda r: -r["ev"])

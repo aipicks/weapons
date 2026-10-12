@@ -134,6 +134,17 @@ def _sog_payload(con, date):
         tm, _ = _et(r["start"])
         n_teams = con.execute("SELECT COUNT(*) FROM team_season WHERE season=?", (CUR_SEASON,)).fetchone()[0]
         op, oc = r["opp_prev"], r["opp_cur"]
+        def attinfo(a):
+            if not a:
+                return None
+            def one(x):
+                if not x or not x["gp"]:
+                    return None
+                return {"gp": x["gp"], "pg": round(x["att"] / x["gp"], 1), "sog": round(x["sog"] / x["gp"], 1),
+                        "ot": round(x["sog"] / x["att"] * 100) if x["att"] else None,
+                        "blk": round(x["blocked"] / x["att"] * 100) if x["att"] else None,
+                        "miss": round(x["missed"] / x["att"] * 100) if x["att"] else None}
+            return {"p": one(a["prev"]), "c": one(a["cur"]), "mu": round(a["mu"], 2), "ot": round(a["ot"] * 100), "rate": round(a["rate"], 1)}
         def possa(t, grp):
             k = grp.lower()
             return {"sa": round(t[f"sa_{k}_pg"], 1), "rank": int(t[f"{k}_rank"]), "gp": t["gp"],
@@ -158,6 +169,7 @@ def _sog_payload(con, date):
             "toi": {"p": _mmss(r["toi_prev"]), "c": _mmss(r["toi_cur"])},
             "ppt": {"p": _mmss(r["pp_prev"]), "c": _mmss(r["pp_cur"])},
             "opp_p": sa(op), "opp_c": sa(oc, n_teams),
+            "att": attinfo(r["att"]),
             "pos_grp": r["pos_grp"], "pos_p": possa(r["opp_pos_prev"], r["pos_grp"]), "pos_c": possa(r["opp_pos_cur"], r["pos_grp"]),
             "def_c": ({"rank": r["opp_def_cur"]["rank"], "c": team_color(r["opp_def_cur"]["rank"], n_teams), "gp": r["opp_def_cur"]["gp"],
                        "xga": round(r["opp_def_cur"]["xga"], 2), "ga": round(r["opp_def_cur"]["ga"], 2),

@@ -100,3 +100,13 @@ def test_margin_distribution_and_puck_line():
     avg = margin_pmf(3.05, 3.05)
     one = sum(p for m, p in avg.items() if abs(m) == 1)
     assert 0.38 < one < 0.48
+
+
+def test_moneypuck_attempts_add_up():
+    """Shot attempts = on goal + missed + blocked for every player (the attempt model relies on it)."""
+    from nhl_tim.config import RAW
+    from nhl_tim.sources import moneypuck
+    if not (RAW / "moneypuck_2025.csv").exists():
+        return
+    for d in moneypuck.fetch(2025, force=False).values():
+        assert abs(d["att"] - d["sog"] - d["missed"] - d["blocked"]) < 0.5

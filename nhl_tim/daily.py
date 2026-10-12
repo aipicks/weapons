@@ -254,6 +254,8 @@ def update_xg(con):
     for year, season, force in ((2025, 20252026, False), (2026, 20262027, True)):
         for pid, d in moneypuck.fetch(year, force).items():
             con.execute("INSERT OR REPLACE INTO player_xg VALUES(?,?,?,?,?)", (pid, season, d["gp"], d["xg"], d["goals"]))
+            con.execute("INSERT OR REPLACE INTO player_att VALUES(?,?,?,?,?,?,?)",
+                        (pid, season, d["gp"], d["att"], d["sog"], d["missed"], d["blocked"]))
 
 
 def update_lines(con):

@@ -21,7 +21,10 @@ def fetch(start_year, force=False):
     for row in csv.DictReader(io.StringIO(text)):
         if row["situation"] == "all":
             out[int(row["playerId"])] = {"gp": int(row["games_played"]), "xg": float(row["I_F_xGoals"]),
-                                         "goals": float(row["I_F_goals"])}
+                                         "goals": float(row["I_F_goals"]),
+                                         "att": float(row["I_F_shotAttempts"]), "sog": float(row["I_F_shotsOnGoal"]),
+                                         "missed": float(row["I_F_missedShots"]),
+                                         "blocked": float(row["I_F_blockedShotAttempts"])}
     return out
 
 
