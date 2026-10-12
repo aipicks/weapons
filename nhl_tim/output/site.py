@@ -142,7 +142,7 @@ def _sog_payload(con, date):
             "rank": r["rank"], "n": r["n"], "tier": tier, "eid": r["event_id"], "start": r["start"],
             "game_name": f"{r['away']} @ {r['home']}", "time": tm, "name": r["name"], "team": r["team"],
             "opp": r["opp"], "pos": r["pos"], "pp": r["pp_unit"], "side": r["side"], "line": r["line"],
-            "price": fmt_american(r["price"]), "p": round(r["p"] * 100, 1), "ev": round(r["ev"] * 100, 1),
+            "price": fmt_american(r["price"]), "book": r["book"], "p": round(r["p"] * 100, 1), "ev": round(r["ev"] * 100, 1),
             "mu": round(r["mu"], 2), "mm": round(r["mu_market"], 2), "po": round(r["p_over"] * 100, 1), "pu": round(r["p_under"] * 100, 1),
             "fair": round(r["fair_over"] * 100, 1),
             "books": [{"b": b["book"], "l": b["line"], "o": fmt_american(b["o"]), "u": fmt_american(b["u"])} for b in r["books"]],

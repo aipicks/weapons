@@ -133,11 +133,23 @@ def build_sog_rows(con, date):
         f_pp = 1 + SOG["pp_scale"] * (pp_p / 60) * ((pk_p / league_pk - 1) if pk_p and league_pk else 0)
         mu = max(0.05, mu0 * f_opp * f_toi * f_pace * f_pp)
 
-        # market reference: FanDuel if listed, else the first book
-        ref = next((b for b in books if b["book"] == MARKET_BOOK), books[0])
-        o_im, u_im = american_to_prob(ref["over_price"]), american_to_prob(ref["under_price"])
+        # market: the books on the most common line (FanDuel's on a tie). The fair probability is the median of each
+        # book's de-vigged over probability; the price to bet is the best over and best under among those books
+        counts = {}
+        for b in books:
+            counts[b["line"]] = counts.get(b["line"], 0) + 1
+        fd_line = next((b["line"] for b in books if b["book"] == MARKET_BOOK), None)
+        mline = max(counts, key=lambda ln: (counts[ln], ln == fd_line, -ln))
+        at = [b for b in books if b["line"] == mline]
+        fairs = []
+        for b in at:
+            o_, u_ = american_to_prob(b["over_price"]), american_to_prob(b["under_price"])
+            fairs.append(o_ / (o_ + u_))
+        bo, bu = max(at, key=lambda b: b["over_price"]), max(at, key=lambda b: b["under_price"])
+        ref = {"line": mline, "over_price": bo["over_price"], "under_price": bu["under_price"],
+               "over_book": bo["book"], "under_book": bu["book"]}
         pre.append(dict(eid=eid, g=g, pid=pid, p=p, team=team, opp=opp, books=books, ref=ref, mu=mu,
-                        fair_over=o_im / (o_im + u_im), cur_s=cur_s, prev_s=prev_s, recent=recent, form=form,
+                        fair_over=statistics.median(fairs), cur_s=cur_s, prev_s=prev_s, recent=recent, form=form,
                         season_rate=season_rate, toi_c=toi_c, toi_p=toi_p, pp_p=pp_p, oc=oc, op=op, wo=wo,
                         sa_eff=sa_eff, xg_t=xg_t))
 
@@ -161,6 +173,7 @@ def build_sog_rows(con, date):
         p_over, p_under = p_over_nopush * (1 - p_push), (1 - p_over_nopush) * (1 - p_push)
         ev_o, ev_u = _ev(p_over, p_under, ref["over_price"]), _ev(p_under, p_over, ref["under_price"])
         side, p_side, ev, price = ("Over", p_over, ev_o, ref["over_price"]) if ev_o >= ev_u else ("Under", p_under, ev_u, ref["under_price"])
+        book = ref["over_book"] if side == "Over" else ref["under_book"]
 
         # --- hit rates at today's line ---
         def hit(ser):
@@ -193,7 +206,7 @@ def build_sog_rows(con, date):
         out.append({
             "event_id": eid, "start": g["start_utc"], "away": g["away"], "home": g["home"], "nhl_id": pid,
             "name": p["name"], "team": team, "opp": opp, "pos": p["pos"], "side": side, "line": line,
-            "price": price, "p": p_side, "ev": ev, "mu": mu, "p_over": p_over, "p_under": p_under,
+            "price": price, "book": book, "p": p_side, "ev": ev, "mu": mu, "p_over": p_over, "p_under": p_under,
             "over_price": ref["over_price"], "under_price": ref["under_price"], "fair_over": fair_over,
             "books": [{"book": b["book"], "line": b["line"], "o": b["over_price"], "u": b["under_price"]} for b in books],
             "sog_prev": sum(prev_s) / len(prev_s) if prev_s else None, "gp_prev": len(prev_s),

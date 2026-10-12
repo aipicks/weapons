@@ -50,7 +50,7 @@ def snapshot(con, date):
     # ---- shots on goal ----
     for r in build_sog_rows(con, date):
         _put(con, date, "sog", f"{r['nhl_id']}", r["start"], name=r["name"], team=r["team"], opp=r["opp"],
-             game=f"{r['away']} @ {r['home']}", side=r["side"], line=r["line"], price=r["price"], book="fanduel/ref",
+             game=f"{r['away']} @ {r['home']}", side=r["side"], line=r["line"], price=r["price"], book=r["book"],
              p=r["p_over"], p_mkt=r["fair_over"], p_model=None, ev=r["ev"], extra=json.dumps({"mu": r["mu"], "best_p": r["p"]}))
         n += 1
     # ---- games: probability rows (calibration) and the best-bet rows (profit) ----

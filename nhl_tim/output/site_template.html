@@ -240,7 +240,7 @@ function sogRow(r){
     <div class="head">
       <span class="rk">${r.rank}</span>
       <span><span class="nm">${esc(r.name)}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span></span>
-        <span class="sidepick"><b class="${r.side==='Over'?'ov':'un'}">${r.side.toUpperCase()} ${r.line}</b> <span>${r.price}</span> <span class="sep">|</span> projected ${r.mu.toFixed(1)} shots (market implies ${r.mm.toFixed(1)})</span>
+        <span class="sidepick"><b class="${r.side==='Over'?'ov':'un'}">${r.side.toUpperCase()} ${r.line}</b> <span>${r.price} <small>${BOOKSHORT(r.book)}</small></span> <span class="sep">|</span> projected ${r.mu.toFixed(1)} shots (market implies ${r.mm.toFixed(1)})</span>
         <ul class="whyl">${why}</ul></span>
       <span class="pct"><b>${r.p.toFixed(1)}%</b><em class="ev ${r.ev>=3?'p':r.ev<=-3?'n':'z'}">EV ${r.ev>0?'+':''}${r.ev.toFixed(1)}%</em><i>${r.game_name.replace(' @ ','@')} ${r.time.replace(' PM','')}</i></span>
       <span class="meter"><div style="width:${Math.min(100, r.p)}%"></div></span>
