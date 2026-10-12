@@ -45,8 +45,10 @@ PRESEASON_D = {t: i + 1 for i, t in enumerate(PRESEASON_D_ORDER)}
 # Shots-on-goal model priors (starting values, not fitted)
 SOG = {
     "prior_games": 20,    # shrink last-season shots/game toward the position average
-    "cur_k": 12,          # games before this season's rate outweighs last season's
-    "form_w": 0.25,       # weight on the last 10 games
+    "cur_k": 20,          # games before this season's rate outweighs last season's (early-season samples are noisy)
+    "last20_w": 0.5,      # share of last season's rate taken from its final 20 games (recent form) vs the full season
+    "last20_k": 10,       # shrinkage games for that last-20 rate toward the position average
+    "form_w": 0.15,       # weight on the last 10 games (small: a short window is volatile)
     "opp_k": 15,          # opponent games before this season's shots-against outweighs last season's
     "opp_exp": 0.7,       # exponent on opponent shots-against vs league average
     "toi_exp": 0.5,       # exponent on this season's TOI vs last season's (scaled by games played)

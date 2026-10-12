@@ -116,7 +116,10 @@ def build_sog_rows(con, date):
 
         # --- projection ---
         k = SOG["prior_games"]
-        prev_rate = (sum(prev_s) + pos_base * k) / (len(prev_s) + k)
+        prev_full = (sum(prev_s) + pos_base * k) / (len(prev_s) + k)
+        last20 = prev_s[:20]  # newest first: last season's final 20 games show how he finished the year
+        prev_l20 = (sum(last20) + pos_base * SOG["last20_k"]) / (len(last20) + SOG["last20_k"])
+        prev_rate = (1 - SOG["last20_w"]) * prev_full + SOG["last20_w"] * prev_l20
         wc = len(cur_s) / (len(cur_s) + SOG["cur_k"])
         season_rate = (1 - wc) * prev_rate + wc * (sum(cur_s) / len(cur_s)) if cur_s else prev_rate
         recent = (cur_s + prev_s)[:10]
