@@ -179,8 +179,7 @@ const save = () => { try { localStorage.setItem('pb', JSON.stringify({pool, grou
 
 let sortKey = 'default', sortAsc = false;
 const LINE_LABEL = {F1:'Line 1',F2:'Line 2',F3:'Line 3',F4:'Line 4',D1:'Pair 1',D2:'Pair 2',D3:'Pair 3'};
-const LINE_CLS = {F1:'good',F2:'warn',F3:'warn',F4:'bad',D1:'good',D2:'warn',D3:'bad'};
-const lineTag = c => c ? `<span class="tag ${LINE_CLS[c]} pptag">${LINE_LABEL[c]}</span>` : `<span class="tag bad pptag">No line</span>`;
+const lineTag = c => `<span class="tag pptag">${c ? LINE_LABEL[c] : 'No line'}</span>`;  // neutral gray: line is context, not a rating
 const sp0 = '<span class="sep">|</span>';
 const label = p => p ? 'Pick #'+p : 'All priced';
 const VIEWS = {tim:'Tim Hortons NHL Challenge', all:'+EV GOAL SCORERS', sog:'Shots on Goal', games:'Game Bets', results:'Results'};
