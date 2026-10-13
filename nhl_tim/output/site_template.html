@@ -179,6 +179,8 @@ const save = () => { try { localStorage.setItem('pb', JSON.stringify({pool, grou
 
 let sortKey = 'default', sortAsc = false;
 const LINE_LABEL = {F1:'Line 1',F2:'Line 2',F3:'Line 3',F4:'Line 4',D1:'Pair 1',D2:'Pair 2',D3:'Pair 3'};
+const LINE_CLS = {F1:'good',F2:'warn',F3:'warn',F4:'bad',D1:'good',D2:'warn',D3:'bad'};
+const lineTag = c => c ? `<span class="tag ${LINE_CLS[c]} pptag">${LINE_LABEL[c]}</span>` : `<span class="tag bad pptag">No line</span>`;
 const sp0 = '<span class="sep">|</span>';
 const label = p => p ? 'Pick #'+p : 'All priced';
 const VIEWS = {tim:'Tim Hortons NHL Challenge', all:'+EV GOAL SCORERS', sog:'Shots on Goal', games:'Game Bets', results:'Results'};
@@ -213,7 +215,7 @@ function row(r){
   return `<article class="row t-${r.tier}">
     <div class="head">
       <span class="rk">${r.rank}</span>
-      <span><span class="nm">${esc(r.name)}${r.chg?'*':''}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span>${r.line?`<span class="tag pptag">${LINE_LABEL[r.line]}</span>`:''}</span>
+      <span><span class="nm">${esc(r.name)}${r.chg?'*':''}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span>${lineTag(r.line)}</span>
         <ul class="whyl">${why}</ul></span>
       <span class="pct"><b>${r.p.toFixed(1)}%</b>${(view!=='all'||r.ev==null)?'':`<em class="ev ${r.ev>=3?'p':r.ev<=-3?'n':'z'}">EV ${r.ev>0?'+':''}${r.ev.toFixed(1)}%</em>`}<i>${r.game_name.replace(' @ ','@')} ${r.time.replace(' PM','')}</i></span>
       <span class="meter"><div style="width:${Math.min(100, r.p*2)}%"></div></span>
@@ -240,7 +242,7 @@ function sogRow(r){
   return `<article class="row t-${r.tier}">
     <div class="head">
       <span class="rk">${r.rank}</span>
-      <span><span class="nm">${esc(r.name)}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span></span>
+      <span><span class="nm">${esc(r.name)}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span>${lineTag(r.tline)}</span>
         <span class="sidepick"><b class="${r.side==='Over'?'ov':'un'}">${r.side.toUpperCase()} ${r.line}</b> <span>${r.price} <small>${BOOKSHORT(r.book)}</small></span> <span class="sep">|</span> projected ${r.mu.toFixed(1)} shots (market implies ${r.mm.toFixed(1)})</span>
         <ul class="whyl">${why}</ul></span>
       <span class="pct"><b>${r.p.toFixed(1)}%</b><em class="ev ${r.ev>=3?'p':r.ev<=-3?'n':'z'}">EV ${r.ev>0?'+':''}${r.ev.toFixed(1)}%</em><i>${r.game_name.replace(' @ ','@')} ${r.time.replace(' PM','')}</i></span>
