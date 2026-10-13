@@ -116,3 +116,14 @@ def test_player_prop_exclude_config():
     from nhl_tim.config import ALLOWED_BOOKS, PLAYER_PROP_EXCLUDE
     for books in PLAYER_PROP_EXCLUDE.values():
         assert set(books) <= set(ALLOWED_BOOKS)
+
+
+def test_board_template_keeps_its_fields():
+    """The page template must keep every stat the user relies on (guards against silently dropping one)."""
+    from nhl_tim.config import ROOT
+    t = (ROOT / "nhl_tim" / "output" / "site_template.html").read_text(encoding="utf8")
+    for label in ("PK (shorthanded)", "Preseason projected defence ranking", "Current defence ranking",
+                  "Shots against to", "Shot attempts last 5", "Attempt projection", "lineTag(r.line)", "lineTag(r.tline)",
+                  "PP time/G", "TOI/G", "Hit rate", "Opp D"):
+        assert label in t, label
+    assert t.count("PK (shorthanded)") >= 2  # goal tab and shots tab
