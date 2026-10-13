@@ -188,7 +188,7 @@ def build_sog_rows(con, date):
         pre.append(dict(eid=eid, g=g, pid=pid, p=p, team=team, opp=opp, books=books, ref=ref, mu=mu,
                         fair_over=statistics.median(fairs), cur_s=cur_s, prev_s=prev_s, recent=recent, form=form,
                         season_rate=season_rate, toi_c=toi_c, toi_p=toi_p, pp_p=pp_p, oc=oc, op=op, wo=wo,
-                        sa_eff=sa_eff, xg_t=xg_t, att=att))
+                        sa_eff=sa_eff, xg_t=xg_t, att=att, grp=grp, pos_prev=pp_, pos_cur=pc_))
 
     # the model's own probabilities are compared with the market's as-is (no forced level match); the shots the
     # market implies at each line are kept for display and for monitoring bias
@@ -258,7 +258,7 @@ def build_sog_rows(con, date):
             "pp_cur": _one(con, "SELECT pp_toi_pg FROM player_pp_toi WHERE nhl_id=? AND season=?", pid, CUR_SEASON),
             "mu_market": q["mu_market"], "opp_prev": op, "opp_cur": oc, "sa_eff": sa_eff, "xg_t": xg_t,
             "pp_unit": _one(con, "SELECT unit FROM pp_unit WHERE nhl_id=?", pid) or 0,
-            "att": q["att"], "pos_grp": grp.upper(), "opp_pos_prev": pp_, "opp_pos_cur": pc_, "opp_def_cur": cur_def.get(opp),
+            "att": q["att"], "pos_grp": q["grp"].upper(), "opp_pos_prev": q["pos_prev"], "opp_pos_cur": q["pos_cur"], "opp_def_cur": cur_def.get(opp),
             "reasons": [(c, t) for _, c, t in reasons[:5]],
         })
     out.sort(key=lambda r: -r["ev"])
