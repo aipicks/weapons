@@ -102,7 +102,7 @@ def ingest_slate(con, date, force=True):
             under = o.get(oid.replace("-over", "-under"), {}).get("byBookmaker", {})
             pinfo = e.get("players", {}).get(x.get("playerID"))
             tid_ = {e["teams"]["home"]["teamID"]: (h, a), e["teams"]["away"]["teamID"]: (a, h)}
-            if not pinfo or pinfo.get("teamID") not in tid_:
+            if not pinfo or not pinfo.get("name") or pinfo.get("teamID") not in tid_:
                 continue
             team_, opp_ = tid_[pinfo["teamID"]]
             pid_ = _find_player(con, team_, pinfo["name"])
@@ -122,7 +122,7 @@ def ingest_slate(con, date, force=True):
             if not (oid.startswith("points-") and oid.endswith("-game-yn-yes")):
                 continue
             pinfo = e.get("players", {}).get(x.get("playerID"))
-            if not pinfo or pinfo.get("teamID") not in tid:
+            if not pinfo or not pinfo.get("name") or pinfo.get("teamID") not in tid:
                 continue
             team, opp = tid[pinfo["teamID"]]
             pid = _find_player(con, team, pinfo["name"])
