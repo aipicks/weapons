@@ -10,6 +10,7 @@ from .config import CUR_SEASON, MARKET_BOOK, PREV_SEASON, SOG
 from .model import logit, sigmoid
 from .odds_math import american_to_prob, implied_team_totals
 from .posshots import current_defense
+from .attempts import last_attempts
 from .sources import nhl_api
 
 
@@ -54,6 +55,13 @@ def _series(pid):
     cur = nhl_api.game_log_gt(pid, CUR_SEASON, 2, force=True)
     prev = nhl_api.game_log_gt(pid, PREV_SEASON, 2)
     return [g["shots"] for g in cur], [g["shots"] for g in prev]
+
+
+def _recent_game_ids(pid):
+    """Game ids of the player's games, newest first (this season then last season)."""
+    cur = nhl_api.game_log_gt(pid, CUR_SEASON, 2)
+    prev = nhl_api.game_log_gt(pid, PREV_SEASON, 2)
+    return [g["gameId"] for g in cur] + [g["gameId"] for g in prev]
 
 
 def _one(con, sql, *a):
@@ -116,6 +124,7 @@ def build_sog_rows(con, date):
         team = p["team"]
         opp = g["away"] if team == g["home"] else g["home"]
         cur_s, prev_s = _series(pid)
+        att5 = last_attempts(pid, _recent_game_ids(pid), 5)
         pos_base = pos_avg.get(p["pos"], 2.0)
 
         # --- projection ---
@@ -188,7 +197,7 @@ def build_sog_rows(con, date):
         pre.append(dict(eid=eid, g=g, pid=pid, p=p, team=team, opp=opp, books=books, ref=ref, mu=mu,
                         fair_over=statistics.median(fairs), cur_s=cur_s, prev_s=prev_s, recent=recent, form=form,
                         season_rate=season_rate, toi_c=toi_c, toi_p=toi_p, pp_p=pp_p, oc=oc, op=op, wo=wo,
-                        sa_eff=sa_eff, xg_t=xg_t, att=att, grp=grp, pos_prev=pp_, pos_cur=pc_))
+                        sa_eff=sa_eff, xg_t=xg_t, att=att, att5=att5, grp=grp, pos_prev=pp_, pos_cur=pc_))
 
     # the model's own probabilities are compared with the market's as-is (no forced level match); the shots the
     # market implies at each line are kept for display and for monitoring bias
@@ -258,7 +267,7 @@ def build_sog_rows(con, date):
             "pp_cur": _one(con, "SELECT pp_toi_pg FROM player_pp_toi WHERE nhl_id=? AND season=?", pid, CUR_SEASON),
             "mu_market": q["mu_market"], "opp_prev": op, "opp_cur": oc, "sa_eff": sa_eff, "xg_t": xg_t,
             "pp_unit": _one(con, "SELECT unit FROM pp_unit WHERE nhl_id=?", pid) or 0,
-            "att": q["att"], "pos_grp": q["grp"].upper(), "opp_pos_prev": q["pos_prev"], "opp_pos_cur": q["pos_cur"], "opp_def_cur": cur_def.get(opp),
+            "att": q["att"], "att5": q["att5"], "pos_grp": q["grp"].upper(), "opp_pos_prev": q["pos_prev"], "opp_pos_cur": q["pos_cur"], "opp_def_cur": cur_def.get(opp),
             "reasons": [(c, t) for _, c, t in reasons[:5]],
         })
     out.sort(key=lambda r: -r["ev"])

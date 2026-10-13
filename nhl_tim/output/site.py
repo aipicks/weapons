@@ -170,7 +170,7 @@ def _sog_payload(con, date):
             "toi": {"p": _mmss(r["toi_prev"]), "c": _mmss(r["toi_cur"])},
             "ppt": {"p": _mmss(r["pp_prev"]), "c": _mmss(r["pp_cur"])},
             "opp_p": sa(op), "opp_c": sa(oc, n_teams),
-            "att": attinfo(r["att"]),
+            "att": attinfo(r["att"]), "att5": r["att5"],
             "pos_grp": r["pos_grp"], "pos_p": possa(r["opp_pos_prev"], r["pos_grp"]), "pos_c": possa(r["opp_pos_cur"], r["pos_grp"]),
             "def_c": ({"rank": r["opp_def_cur"]["rank"], "c": team_color(r["opp_def_cur"]["rank"], n_teams), "gp": r["opp_def_cur"]["gp"],
                        "xga": round(r["opp_def_cur"]["xga"], 2), "ga": round(r["opp_def_cur"]["ga"], 2),
