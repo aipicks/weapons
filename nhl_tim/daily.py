@@ -245,6 +245,9 @@ def update_team_mp(con):
             for sit, d in sits.items():
                 con.execute("INSERT OR REPLACE INTO team_mp VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                             (team, season, sit, d["gp"], d["ice"], d["xgf"], d["xga"], d["gf"], d["ga"], d["sf"], d["sa"]))
+                if sit == "all":  # shot attempts the team allows: volume, how many get blocked, how many reach the net
+                    con.execute("INSERT OR REPLACE INTO team_att VALUES(?,?,?,?,?,?,?)",
+                                (team, season, d["gp"], d["att_a"], d["sa"], d["blk_a"], d["miss_a"]))
         for pid, d in moneypuck.fetch_goalies(year, force).items():
             con.execute("INSERT OR REPLACE INTO goalie_xg VALUES(?,?,?,?,?,?)", (pid, season, d["gp"], d["xg"], d["goals"], d["shots"]))
 

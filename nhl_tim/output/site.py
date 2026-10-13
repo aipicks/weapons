@@ -134,6 +134,13 @@ def _sog_payload(con, date):
         tm, _ = _et(r["start"])
         n_teams = con.execute("SELECT COUNT(*) FROM team_season WHERE season=?", (CUR_SEASON,)).fetchone()[0]
         op, oc = r["opp_prev"], r["opp_cur"]
+        def oppatt(t, rk, opp_):
+            if not t:
+                return None
+            return {"pg": round(t["att_a"] / t["gp"], 1), "blk": round(t["blk_a"] / t["att_a"] * 100, 1),
+                    "ot": round(t["sog_a"] / t["att_a"] * 100, 1), "gp": t["gp"],
+                    "r_att": rk["att"][opp_], "r_blk": rk["blk"][opp_], "r_ot": rk["ot"][opp_],
+                    "c_att": team_color(rk["att"][opp_]), "c_blk": team_color(rk["blk"][opp_]), "c_ot": team_color(rk["ot"][opp_])}
         def attinfo(a):
             if not a:
                 return None
@@ -175,6 +182,9 @@ def _sog_payload(con, date):
                     "opk_p": _mmss(_pk(con, r["opp"], PREV_SEASON)), "opk_c": _mmss(_pk(con, r["opp"], CUR_SEASON))},
             "opp_p": sa(op), "opp_c": sa(oc, n_teams),
             "att": attinfo(r["att"]), "att5": r["att5"],
+            "oa_p": oppatt(r["opp_att"][0], r["att_rank"][PREV_SEASON], r["opp"]),
+            "oa_c": oppatt(r["opp_att"][1], r["att_rank"][CUR_SEASON], r["opp"]),
+            "f_att": round(r["att"]["f_att"], 3) if r["att"] and "f_att" in r["att"] else None,
             "pos_grp": r["pos_grp"], "pos_p": possa(r["opp_pos_prev"], r["pos_grp"]), "pos_c": possa(r["opp_pos_cur"], r["pos_grp"]),
             "def_c": ({"rank": r["opp_def_cur"]["rank"], "c": team_color(r["opp_def_cur"]["rank"], n_teams), "gp": r["opp_def_cur"]["gp"],
                        "xga": round(r["opp_def_cur"]["xga"], 2), "ga": round(r["opp_def_cur"]["ga"], 2),

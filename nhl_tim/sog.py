@@ -102,6 +102,19 @@ def build_sog_rows(con, date):
     teams_cur = {r["team"]: r for r in con.execute("SELECT * FROM team_season WHERE season=?", (CUR_SEASON,))}
     sa_all = [t["sa_pg"] for t in teams_prev.values() if t["sa_pg"]]
     league_sa = sum(sa_all) / len(sa_all) if sa_all else 30.0
+    att_prev = {r["team"]: r for r in con.execute("SELECT * FROM team_att WHERE season=? AND gp>0", (PREV_SEASON,))}
+    att_cur = {r["team"]: r for r in con.execute("SELECT * FROM team_att WHERE season=? AND gp>0", (CUR_SEASON,))}
+    lg_att = (sum(t["att_a"] for t in att_prev.values()) / sum(t["gp"] for t in att_prev.values())) if att_prev else None
+    lg_ot = (sum(t["sog_a"] for t in att_prev.values()) / sum(t["att_a"] for t in att_prev.values())) if att_prev else None
+
+    def _ranks(rows_, key, desc=False):
+        order = sorted(rows_, key=lambda t: key(rows_[t]), reverse=desc)
+        return {t: i + 1 for i, t in enumerate(order)}
+    att_rank = {}
+    for ssn, rows_ in ((PREV_SEASON, att_prev), (CUR_SEASON, att_cur)):
+        att_rank[ssn] = {"att": _ranks(rows_, lambda t: t["att_a"] / t["gp"]),
+                         "blk": _ranks(rows_, lambda t: t["blk_a"] / t["att_a"], desc=True),
+                         "ot": _ranks(rows_, lambda t: t["sog_a"] / t["att_a"])}
     pos_prev = {r["team"]: r for r in con.execute("SELECT * FROM team_pos_sa WHERE season=?", (PREV_SEASON,))}
     pos_cur = {r["team"]: r for r in con.execute("SELECT * FROM team_pos_sa WHERE season=?", (CUR_SEASON,))}
     lg_pos = {k: (sum(t[f"sa_{k}_pg"] for t in pos_prev.values()) / len(pos_prev)) if pos_prev else None for k in ("f", "d")}
@@ -154,7 +167,6 @@ def build_sog_rows(con, date):
             tot_s = sum(x["sog"] for x in (a_prev, a_cur) if x)
             ot = (tot_s + po * SOG["ot_k"]) / (tot_a + SOG["ot_k"])
             mu_att = att_rate * ot
-            mu0 = (1 - SOG["att_w"]) * mu0 + SOG["att_w"] * mu_att
             att = {"rate": att_rate, "ot": ot, "mu": mu_att, "prev": a_prev, "cur": a_cur}
 
         oc, op = teams_cur.get(opp), teams_prev.get(opp)
@@ -177,7 +189,22 @@ def build_sog_rows(con, date):
         pp_p = _one(con, "SELECT pp_toi_pg FROM player_pp_toi WHERE nhl_id=? AND season=?", pid, PREV_SEASON) or 0.0
         pk_p = _one(con, "SELECT pk_toi_pg FROM team_pk_toi WHERE team=? AND season=?", opp, PREV_SEASON)
         f_pp = 1 + SOG["pp_scale"] * (pp_p / 60) * ((pk_p / league_pk - 1) if pk_p and league_pk else 0)
-        mu = max(0.05, mu0 * f_opp * f_toi * f_pace * f_pp)
+        # the shots-based rate takes the opponent's shots-allowed-to-this-position factor; the attempt-based rate takes
+        # the opponent's attempt volume allowed and its on-target share (blocks and misses). The two are then blended.
+        oa_p, oa_c = att_prev.get(opp), att_cur.get(opp)
+        f_att = 1.0
+        if oa_p and lg_att and lg_ot:
+            wa = oa_c["gp"] / (oa_c["gp"] + SOG["opp_k"]) if oa_c else 0.0
+            att_pg = (1 - wa) * oa_p["att_a"] / oa_p["gp"] + (wa * oa_c["att_a"] / oa_c["gp"] if oa_c else 0.0)
+            ot_al = (1 - wa) * oa_p["sog_a"] / oa_p["att_a"] + (wa * oa_c["sog_a"] / oa_c["att_a"] if oa_c else 0.0)
+            f_att = (att_pg / lg_att) ** SOG["opp_exp"] * (ot_al / lg_ot) ** SOG["ot_opp_exp"]
+        mu_shots = mu0 * f_opp
+        if att:
+            att["adj"], att["f_att"] = att["mu"] * f_att, f_att
+            mu_base = (1 - SOG["att_w"]) * mu_shots + SOG["att_w"] * att["adj"]
+        else:
+            mu_base = mu_shots
+        mu = max(0.05, mu_base * f_toi * f_pace * f_pp)
 
         # market: the books on the most common line (FanDuel's on a tie). The fair probability is the median of each
         # book's de-vigged over probability; the price to bet is the best over and best under among those books
@@ -197,7 +224,7 @@ def build_sog_rows(con, date):
         pre.append(dict(eid=eid, g=g, pid=pid, p=p, team=team, opp=opp, books=books, ref=ref, mu=mu,
                         fair_over=statistics.median(fairs), cur_s=cur_s, prev_s=prev_s, recent=recent, form=form,
                         season_rate=season_rate, toi_c=toi_c, toi_p=toi_p, pp_p=pp_p, oc=oc, op=op, wo=wo,
-                        sa_eff=sa_eff, xg_t=xg_t, att=att, att5=att5, grp=grp, pos_prev=pp_, pos_cur=pc_))
+                        sa_eff=sa_eff, xg_t=xg_t, att=att, att5=att5, opp_att=(oa_p, oa_c), grp=grp, pos_prev=pp_, pos_cur=pc_))
 
     # the model's own probabilities are compared with the market's as-is (no forced level match); the shots the
     # market implies at each line are kept for display and for monitoring bias
@@ -267,7 +294,7 @@ def build_sog_rows(con, date):
             "pp_cur": _one(con, "SELECT pp_toi_pg FROM player_pp_toi WHERE nhl_id=? AND season=?", pid, CUR_SEASON),
             "mu_market": q["mu_market"], "opp_prev": op, "opp_cur": oc, "sa_eff": sa_eff, "xg_t": xg_t,
             "pp_unit": _one(con, "SELECT unit FROM pp_unit WHERE nhl_id=?", pid) or 0,
-            "att": q["att"], "att5": q["att5"], "pos_grp": q["grp"].upper(), "opp_pos_prev": q["pos_prev"], "opp_pos_cur": q["pos_cur"], "opp_def_cur": cur_def.get(opp),
+            "att": q["att"], "att5": q["att5"], "opp_att": q["opp_att"], "att_rank": att_rank, "pos_grp": q["grp"].upper(), "opp_pos_prev": q["pos_prev"], "opp_pos_cur": q["pos_cur"], "opp_def_cur": cur_def.get(opp),
             "reasons": [(c, t) for _, c, t in reasons[:5]],
         })
     out.sort(key=lambda r: -r["ev"])

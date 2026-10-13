@@ -48,6 +48,7 @@ SOG = {
     "cur_k": 20,          # games before this season's rate outweighs last season's (early-season samples are noisy)
     "last20_w": 0.5,      # share of last season's rate taken from its final 20 games (recent form) vs the full season
     "last20_k": 10,       # shrinkage games for that last-20 rate toward the position average
+    "ot_opp_exp": 0.5,    # exponent on the opponent's on-target share of attempts allowed vs league (blocks/misses)
     "att_w": 0.5,         # weight on the shot-attempt projection (attempts/G x regressed on-target rate) vs shots-based
     "att_prior_games": 20,  # shrink attempts/game toward the position average
     "ot_k": 150,          # attempts of prior added when regressing a player's on-target rate toward the position average

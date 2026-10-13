@@ -46,7 +46,9 @@ def fetch_teams(start_year, force=False):
         out.setdefault(row["team"], {})[row["situation"]] = {
             "gp": int(row["games_played"]), "ice": float(row["iceTime"]), "xgf": float(row["xGoalsFor"]),
             "xga": float(row["xGoalsAgainst"]), "gf": float(row["goalsFor"]), "ga": float(row["goalsAgainst"]),
-            "sf": float(row["shotsOnGoalFor"]), "sa": float(row["shotsOnGoalAgainst"])}
+            "sf": float(row["shotsOnGoalFor"]), "sa": float(row["shotsOnGoalAgainst"]),
+            "att_a": float(row["shotAttemptsAgainst"]), "blk_a": float(row["blockedShotAttemptsAgainst"]),
+            "miss_a": float(row["missedShotsAgainst"])}
     return out
 
 
