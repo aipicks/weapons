@@ -1,6 +1,6 @@
 """Daily refresh: current-season skater/goalie stats, games+odds (SGO), projected goalies (RotoWire)."""
 from .posshots import update_pos_shots
-from .config import ALLOWED_BOOKS, CUR_SEASON
+from .config import ALLOWED_BOOKS, CUR_SEASON, PLAYER_PROP_EXCLUDE
 from .db import connect
 from .normalize import norm_name, norm_team
 from .odds_math import american_to_prob
@@ -107,7 +107,7 @@ def ingest_slate(con, date, force=True):
             team_, opp_ = tid_[pinfo["teamID"]]
             pid_ = _find_player(con, team_, pinfo["name"])
             for b, bo in x.get("byBookmaker", {}).items():
-                if b not in ALLOWED_BOOKS:
+                if b not in ALLOWED_BOOKS or b in PLAYER_PROP_EXCLUDE.get(date, ()):
                     continue
                 ub = under.get(b, {})
                 if bo.get("odds") is None or bo.get("overUnder") is None or ub.get("odds") is None:
@@ -129,7 +129,7 @@ def ingest_slate(con, date, force=True):
             if pid is None:
                 stats["atg_unmatched"].append((team, pinfo["name"]))
             for b, bo in x.get("byBookmaker", {}).items():
-                if b not in ALLOWED_BOOKS:
+                if b not in ALLOWED_BOOKS or b in PLAYER_PROP_EXCLUDE.get(date, ()):
                     continue
                 if bo.get("odds") is None or not bo.get("available", True):
                     continue

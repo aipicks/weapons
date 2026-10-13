@@ -110,3 +110,9 @@ def test_moneypuck_attempts_add_up():
         return
     for d in moneypuck.fetch(2025, force=False).values():
         assert abs(d["att"] - d["sog"] - d["missed"] - d["blocked"]) < 0.5
+
+
+def test_player_prop_exclude_config():
+    from nhl_tim.config import ALLOWED_BOOKS, PLAYER_PROP_EXCLUDE
+    for books in PLAYER_PROP_EXCLUDE.values():
+        assert set(books) <= set(ALLOWED_BOOKS)

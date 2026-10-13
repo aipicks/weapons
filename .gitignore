@@ -5,3 +5,5 @@ __pycache__/
 .env.txt
 *.env
 board.html
+
+CLAUDE.md

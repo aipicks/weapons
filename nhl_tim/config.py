@@ -77,3 +77,6 @@ GAME = {
 
 # Only these five sportsbooks are ever used (stored, displayed, or priced). Everything else (ESPN BET, Unibet, PointsBet, ...) is dropped at ingest.
 ALLOWED_BOOKS = ("fanduel", "draftkings", "betmgm", "bovada", "caesars")
+
+# Books to ignore for player props (shots, anytime goal) on a given date, e.g. when a book's prop prices look unusable
+PLAYER_PROP_EXCLUDE = {"2026-10-13": ("bovada",)}
