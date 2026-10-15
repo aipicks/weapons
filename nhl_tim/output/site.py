@@ -113,7 +113,7 @@ def _rows(con, rows):
             "name": r["name"], "team": r["team"], "opp": r["opp"], "pos": r["pos"], "chg": r["team_changed"],
             "p": round(r["p"] * 100, 1), "pm": round(r["p_mkt"] * 100, 1) if r["p_mkt"] else None,
             "pp": r["pp_unit"], "ev": ev, "edge": edge, "line": line, "sk": sk,
-            "tm": {"rank": _TM[r["team"]]["rank"], "n": _TM[r["team"]]["n"]} if r["team"] in _TM else None,
+            "tm": {"rank": _TM[r["team"]]["rank"], "n": _TM[r["team"]]["n"], "score": round(_TM[r["team"]]["score"], 1)} if r["team"] in _TM else None,
             "any": {"am": fmt_american(a["american"]), "pr": round(a["implied"] * 100, 1)} if a else None,
             "game": game, "xg": round(r["xg"], 2) if r["xg"] is not None else None,
             "s25": {"toi": _mmss(r["toi_prev"]), "gp": prev["gp"], "g": prev["g"], "sog": prev["sog"], "gg": prev["goal_games"],
