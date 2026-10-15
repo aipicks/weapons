@@ -8,6 +8,9 @@ from ..db import connect
 from ..model import build_rows
 from ..sog import build_sog_rows
 from ..games import build_game_rows, best_value_pick
+from ..matchup_rank import team_matchups
+
+_TM = {}  # team -> matchup entry for the slate being built (set in build_site)
 from ..tracking import results as _results
 from ..odds_math import fmt_american
 from .table import _et, team_color, third_color
@@ -97,6 +100,7 @@ def _rows(con, rows):
               "toip": r["toi_prev"], "toic": r["toi_cur"], "toib": wavg(r["toi_prev"], gp25, r["toi_cur"], gp26),
               "pkp": pk_p, "pkc": pk_c, "pkb": wavg(pk_p, 82, pk_c, oc_gp),
               "line": {"F1": 1, "F2": 2, "F3": 3, "F4": 4, "D1": 5, "D2": 6, "D3": 7}.get(line),
+              "tm": (_TM[r["team"]]["n"] + 1 - _TM[r["team"]]["rank"]) if r["team"] in _TM else None,
               "odds": a["implied"] if a else None}
         goalie = None
         if gp and gp["goalie_name"]:
@@ -109,6 +113,7 @@ def _rows(con, rows):
             "name": r["name"], "team": r["team"], "opp": r["opp"], "pos": r["pos"], "chg": r["team_changed"],
             "p": round(r["p"] * 100, 1), "pm": round(r["p_mkt"] * 100, 1) if r["p_mkt"] else None,
             "pp": r["pp_unit"], "ev": ev, "edge": edge, "line": line, "sk": sk,
+            "tm": {"rank": _TM[r["team"]]["rank"], "n": _TM[r["team"]]["n"]} if r["team"] in _TM else None,
             "any": {"am": fmt_american(a["american"]), "pr": round(a["implied"] * 100, 1)} if a else None,
             "game": game, "xg": round(r["xg"], 2) if r["xg"] is not None else None,
             "s25": {"toi": _mmss(r["toi_prev"]), "gp": prev["gp"], "g": prev["g"], "sog": prev["sog"], "gg": prev["goal_games"],
@@ -294,9 +299,16 @@ def build_site(date):
     all_rows = sorted([r for r in all_rows if r["ev"] is not None and r["p"] >= MIN_P_ALL], key=lambda r: r["rank"])[:TOP_N_ALL]
     for i_, r_ in enumerate(all_rows):  # renumber 1..N now that the list is filtered
         r_["rank"], r_["pool_n"] = i_ + 1, len(all_rows)
+    matchups = team_matchups(con, date)
+    _TM.clear()
+    _TM.update({m["team"]: m for m in matchups})
     meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
             for k in ("last_pp_update", "daily_updated")}
     payload = {"date": date, "rows": _rows(con, rows), "all": _rows(con, all_rows), "meta": meta,
+               "matchups": [{"rank": m["rank"], "team": m["team"], "opp": m["opp"], "home": m["home"],
+                            "goalie": m["goalie"], "status": m["status"], "gf": round((m["gf"] - 1) * 100, 1), "r_goalie": m["r_goalie"],
+                            "xg": round(m["xg"], 2), "r_xg": m["r_xg"], "r_def": m["r_def"], "def": round(m["def_score"], 1),
+                            "score": round(m["score"], 1)} for m in matchups],
                "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date), "sog": _sog_payload(con, date), "games": _games_payload(con, date), "safe": _safest_payload(con, date), "results": _results(con)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)

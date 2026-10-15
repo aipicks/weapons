@@ -78,6 +78,7 @@ h1 span{color:var(--accent)}
 .c-gray{background:var(--warn-bg);color:var(--warn);padding:0 4px;border-radius:3px}
 .c-na{background:var(--mid-bg);color:var(--mid);padding:0 4px;border-radius:3px}
 .whyl{margin:5px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px}
+.mt{width:100%;border-collapse:collapse;font-size:12px}.mt th,.mt td{padding:4px 5px;text-align:left;vertical-align:top}.mt th{font-weight:400;color:var(--mid)}
 .pptag{white-space:nowrap;margin-left:8px;font-size:12px;vertical-align:middle}
 .whyl li{font-size:11.5px;padding:1px 6px;border-radius:4px}
 .whyl li.z{background:var(--warn-bg);color:var(--warn)} .whyl li.p{background:var(--good-bg);color:var(--good)} .whyl li.n{background:var(--bad-bg);color:var(--bad)}
@@ -144,7 +145,8 @@ h1 span{color:var(--accent)}
         <option value="ggp">Goal-game % · last season</option><option value="ggc">Goal-game % · this season</option><option value="ggb">Goal-game % · combined</option>
         <option value="toip">TOI/G · last season</option><option value="toic">TOI/G · this season</option><option value="toib">TOI/G · combined</option>
         <option value="pkp">Opp shorthanded time · last season</option><option value="pkc">Opp shorthanded time · this season</option><option value="pkb">Opp shorthanded time · combined</option>
-        <option value="line">Line / pair</option><option value="odds">Anytime goal odds</option></select>
+        <option value="line">Line / pair</option><option value="odds">Anytime goal odds</option>
+        <option value="tm">Team matchup rank (opposing goalie + team xG + opposing defence)</option></select>
       <button class="chip" id="f-dir" aria-pressed="false">High → low</button>
     </div>
     <div class="tools">
@@ -214,7 +216,7 @@ function row(r){
   return `<article class="row t-${r.tier}">
     <div class="head">
       <span class="rk">${r.rank}</span>
-      <span><span class="nm">${esc(r.name)}${r.chg?'*':''}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span>${lineTag(r.line)}</span>
+      <span><span class="nm">${esc(r.name)}${r.chg?'*':''}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span>${lineTag(r.line)}${r.tm?`<span class="tag pptag">Matchup #${r.tm.rank}</span>`:''}</span>
         <ul class="whyl">${why}</ul></span>
       <span class="pct"><b>${r.p.toFixed(1)}%</b>${(view!=='all'||r.ev==null)?'':`<em class="ev ${r.ev>=3?'p':r.ev<=-3?'n':'z'}">EV ${r.ev>0?'+':''}${r.ev.toFixed(1)}%</em>`}<i>${r.game_name.replace(' @ ','@')} ${r.time.replace(' PM','')}</i></span>
       <span class="meter"><div style="width:${Math.min(100, r.p*2)}%"></div></span>
@@ -362,6 +364,13 @@ function filtered(){
   }
   return out;
 }
+function matchupTable(){
+  const M = D.matchups || [];
+  if (!M.length) return '';
+  const st = {Confirmed:'confirmed', Likely:'likely', Unconfirmed:'unconfirmed'};
+  const rowsH = M.map(m => `<tr><td>${m.rank}</td><td><b>${m.team}</b> ${m.home?'vs':'@'} ${m.opp}</td><td>${esc(m.goalie||'?')} <small>(${st[m.status]||'?'}, ${m.gf>0?'+':''}${m.gf}% goals vs xG)</small> <b>#${m.r_goalie}</b></td><td>${m.xg} <b>#${m.r_xg}</b></td><td>${m.opp} <b>#${m.r_def}</b></td><td>${m.score}</td></tr>`).join('');
+  return `<div class="gtop"><h3>Team matchup ranking</h3><p class="note">1 = best spot for that team's skaters. Total = average of three ranks: the opposing goalie (weaker is better), the team's expected goals, and the opposing defence (current defence, last season, preseason). Each pool below is sorted by this.</p><table class="mt"><tr><th>#</th><th>Team</th><th>Opposing goalie (#1 = weakest)</th><th>Team xG (#1 = most)</th><th>Opposing defence (#1 = weakest)</th><th>Score</th></tr>${rowsH}</table></div>`;
+}
 function render(){
   if (view === 'games') return renderGames();
   if (view === 'results') return renderResults();
@@ -384,7 +393,7 @@ function render(){
     html = shown.map(rf).join('');
     if (all && sorted.length > shown.length) html += `<button class="more" id="more">Show ${Math.min(40, sorted.length-shown.length)} more (${sorted.length-shown.length} left)</button>`;
   }
-  $('#list').innerHTML = html;
+  $('#list').innerHTML = (view === 'tim' && sortKey === 'tm' ? matchupTable() : '') + html;
   $('#count').textContent = rows.length + (view === 'sog' ? ' players with a shots line' : ' players') + (view==='all' ? ' · top 30 by EV (model probability 15%+) across the whole slate' : view==='sog' ? ' · best side of every player shots line, ranked by EV' : '');
   $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
   $('#tabs').hidden = view !== 'tim';
