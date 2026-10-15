@@ -200,6 +200,10 @@ function gline(s, extra){
   return `${s.gaa.toFixed(2)} GAA ${rk(s.gr, s.gc)}<span class="sep">|</span>${String(s.sv.toFixed(3)).replace(/^0/,'')} SV% ${rk(s.svr, s.svc)}<span class="sep">|</span>${s.gp} GP${s.starts!=null?' / '+s.starts+' GS':''}`;
 }
 
+const pkRank = k => k ? ` <span class="${col(k.c)}">(#${k.r} of ${k.n} this season, 1 = most shorthanded time)</span>` : '';
+const smBadge = t => { if (!t) return '';
+  const c = t.rank <= t.n/3 ? 'good' : t.rank > 2*t.n/3 ? 'bad' : 'warn';
+  return `<span class="tmx ${c}" title="Shots matchup: opponent attempts, shots, shots to this position, blocks, on-target share allowed">SHOTS<b>#${t.rank}</b>${t.score.toFixed(1)}</span>`; };
 const tmBadge = t => { if (!t) return '';
   const c = t.rank <= t.n/3 ? 'good' : t.rank > 2*t.n/3 ? 'bad' : 'warn';
   return `<span class="tmx ${c}" title="Team matchup: opposing goalie + team xG + opposing defence">TEAM<b>#${t.rank}</b>${t.score}</span>`; };
@@ -231,7 +235,7 @@ function row(r){
     <div class="detail">
       <div class="ln"><span class="lab">25–26</span><span class="v">${s25}</span></div>
       <div class="ln"><span class="lab">26–27</span><span class="v">${s26}</span></div>
-      <div class="ln"><span class="lab">PP time</span><span class="v">Player 25–26 ${r.ppt.p||'0:00'}/G ${sp} 26–27 ${r.ppt.c||'0:00'}/G<br>${r.opp} PK (shorthanded) 25–26 ${r.ppt.opk_p||'?'}/G ${sp} 26–27 ${r.ppt.opk_c||'?'}/G</span></div>
+      <div class="ln"><span class="lab">PP time</span><span class="v">Player 25–26 ${r.ppt.p||'0:00'}/G ${sp} 26–27 ${r.ppt.c||'0:00'}/G<br>${r.opp} PK (shorthanded) 25–26 ${r.ppt.opk_p||'?'}/G ${sp} 26–27 ${r.ppt.opk_c||'?'}/G${pkRank(r.ppt.opk_r)}</span></div>
       <div class="ln"><span class="lab">Bets</span><span class="v">Anytime ${any} ${sp} ${gm} ${sp} ${r.team} ${r.xg!=null?r.xg.toFixed(2):'?'} xG</span></div>
       <div class="ln"><span class="lab">Opp D</span><span class="v">${r.opp} ${od}</span></div>
       <div class="ln"><span class="lab">Goalie</span><span class="v">${gb}</span></div>
@@ -249,20 +253,20 @@ function sogRow(r){
   const books = r.books.map(b => `${b.b.replace('espnbet','ESPN').replace('draftkings','DK').replace('fanduel','FD').replace('betmgm','MGM').replace('bovada','Bov').replace('caesars','CZR')} ${b.l} (O ${b.o} / U ${b.u})`).join(' · ');
   const s = (x, y) => x ? `${x.avg.toFixed(2)}/G (${x.gp} GP)` : 'N/A';
   return `<article class="row t-${r.tier}">
-    <div class="head">
+    <div class="head${r.sm?' has-tm':''}">
       <span class="rk">${r.rank}</span>
       <span><span class="nm">${esc(r.name)}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span>${lineTag(r.tline)}</span>
         <span class="sidepick"><b class="${r.side==='Over'?'ov':'un'}">${r.side.toUpperCase()} ${r.line}</b> <span>${r.price} <small>${BOOKSHORT(r.book)}</small></span> <span class="sep">|</span> projected ${r.mu.toFixed(1)} shots (market implies ${r.mm.toFixed(1)})</span>
         <ul class="whyl">${why}</ul></span>
-      <span class="pct"><b>${r.p.toFixed(1)}%</b><em class="ev ${r.ev>=3?'p':r.ev<=-3?'n':'z'}">EV ${r.ev>0?'+':''}${r.ev.toFixed(1)}%</em><i>${r.game_name.replace(' @ ','@')} ${r.time.replace(' PM','')}</i></span>
+      ${smBadge(r.sm)}<span class="pct"><b>${r.p.toFixed(1)}%</b><em class="ev ${r.ev>=3?'p':r.ev<=-3?'n':'z'}">EV ${r.ev>0?'+':''}${r.ev.toFixed(1)}%</em><i>${r.game_name.replace(' @ ','@')} ${r.time.replace(' PM','')}</i></span>
       <span class="meter"><div style="width:${Math.min(100, r.p)}%"></div></span>
     </div>
     <div class="detail">
       <div class="ln"><span class="lab">Shots</span><span class="v">25–26 ${s(r.s25)} ${sp} 26–27 ${s(r.s26)} ${sp} last ${r.nform} <b>${r.form==null?'?':r.form}/G</b> ${sp} last 5: ${r.last5.join(', ')||'?'}<br>Shot attempts last 5: <b>${r.att5.length ? r.att5.join(', ') : '?'}</b>${r.att5.length ? ` (avg ${(r.att5.reduce((a,b)=>a+b,0)/r.att5.length).toFixed(1)})` : ''}</span></div>
       <div class="ln"><span class="lab">Attempts</span><span class="v">${r.att ? `25–26 ${attS(r.att.p)} ${sp} 26–27 ${attS(r.att.c)}<br>Attempt projection <b>${r.att.rate}/G x ${r.att.ot}% on target = ${r.att.mu}</b> shots` : 'N/A'}</span></div>
       <div class="ln"><span class="lab">Hit rate</span><span class="v">Over ${r.line}: last 10 <b>${pc(r.h10)}</b> ${sp} full sample <b>${pc(r.hs)}</b> ${sp} model P(over) ${r.po}% / P(under) ${r.pu}% ${sp} market over ${r.fair}%</span></div>
-      <div class="ln"><span class="lab">Usage</span><span class="v">TOI/G 25–26 ${r.toi.p||'?'} ${sp} 26–27 ${r.toi.c||'?'}<br>PP time/G 25–26 ${r.ppt.p||'0:00'} ${sp} 26–27 ${r.ppt.c||'0:00'}<br>${r.opp} PK (shorthanded) 25–26 ${r.ppt.opk_p||'?'}/G ${sp} 26–27 ${r.ppt.opk_c||'?'}/G</span></div>
-      <div class="ln"><span class="lab">Opp D</span><span class="v">${r.opp} shots against: ${opSA(r.opp_p,'25–26')} ${sp} ${opSA(r.opp_c,'26–27')} ${sp} Preseason projected defence ranking <span class="${col(r.opp_pre.c)}">#${r.opp_pre.rank}${r.opp_pre.tie?' (tied)':''}</span><br>Current defence ranking ${r.def_c ? `<span class="${col(r.def_c.c)}">#${r.def_c.rank}</span> (xGA ${r.def_c.xga}/G ${sp} GA ${r.def_c.ga}/G ${sp} SA ${r.def_c.sa}/G ${sp} ${r.def_c.gp} GP)` : 'N/A'}<br>Shots against to ${r.pos_grp==='D'?'defensemen':'forwards'}: ${opSA(r.pos_p,'25–26')} ${sp} ${opSA(r.pos_c,'26–27')}
+      <div class="ln"><span class="lab">Usage</span><span class="v">TOI/G 25–26 ${r.toi.p||'?'} ${sp} 26–27 ${r.toi.c||'?'}<br>PP time/G 25–26 ${r.ppt.p||'0:00'} ${sp} 26–27 ${r.ppt.c||'0:00'}<br>${r.opp} PK (shorthanded) 25–26 ${r.ppt.opk_p||'?'}/G ${sp} 26–27 ${r.ppt.opk_c||'?'}/G${pkRank(r.ppt.opk_r)}</span></div>
+      <div class="ln"><span class="lab">Opp D</span><span class="v">${r.opp} shots against: ${opSA(r.opp_p,'25–26')} ${sp} ${opSA(r.opp_c,'26–27')} ${sp} Preseason projected defence ranking <span class="${col(r.opp_pre.c)}">#${r.opp_pre.rank}${r.opp_pre.tie?' (tied)':''}</span><br>Current defence ranking ${r.def_c ? `<span class="${col(r.def_c.c)}">#${r.def_c.rank}</span> (xGA ${r.def_c.xga}/G ${sp} GA ${r.def_c.ga}/G ${sp} SA ${r.def_c.sa}/G ${sp} ${r.def_c.gp} GP)` : 'N/A'}<br>Shots against to ${r.pos_grp==='D'?'defensemen':'forwards'}: ${opSA(r.pos_p,'25–26')} ${sp} ${opSA(r.pos_c,'26–27')}${r.sm?`<br>Shots matchup score for ${r.pos_grp==='D'?'defensemen':'forwards'}: <b>#${r.sm.rank} of ${r.sm.n}</b> (score ${r.sm.score.toFixed(1)}, 1 = best spot) ${sp} attempts #${r.sm.r_att} ${'·'} shots #${r.sm.r_sog} ${'·'} to ${r.pos_grp==='D'?'D':'F'} #${r.sm.r_pos} ${'·'} blocks #${r.sm.r_blk} ${'·'} on target #${r.sm.r_ot}`:''}
         <br>Shot attempts against: ${oaS(r.oa_p,'25–26')} ${sp} ${oaS(r.oa_c,'26–27')}${r.f_att!=null?`<br>Attempt-based projection adjusted x${r.f_att} for this opponent (attempt volume and blocks/misses)`:''}</span></div>
       <div class="ln"><span class="lab">Lines</span><span class="v">${books}</span></div>
     </div></article>`;

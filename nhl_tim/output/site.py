@@ -9,6 +9,7 @@ from ..model import build_rows
 from ..sog import build_sog_rows
 from ..games import build_game_rows, best_value_pick
 from ..matchup_rank import team_matchups
+from ..shotmatch import shot_matchups
 
 _TM = {}  # team -> matchup entry for the slate being built (set in build_site)
 from ..tracking import results as _results
@@ -52,7 +53,21 @@ def _gg(pid):
     return _GG[pid]
 
 
+def _pk_ranks(con):
+    """{team: (rank, n)} for this season's shorthanded time per game, 1 = the most."""
+    rows = con.execute("SELECT team FROM team_pk_toi WHERE season=? ORDER BY pk_toi_pg DESC", (CUR_SEASON,)).fetchall()
+    return {r["team"]: (i + 1, len(rows)) for i, r in enumerate(rows)}
+
+
+def _pkr(ranks, team):
+    if team not in ranks:
+        return None
+    r, n = ranks[team]
+    return {"r": r, "n": n, "c": team_color(n + 1 - r, n)}  # most shorthanded time is the best spot for a PP player
+
+
 def _rows(con, rows):
+    pkr = _pk_ranks(con)
     out = []
     for r in rows:
         tm, _ = _et(r["start"])
@@ -127,13 +142,16 @@ def _rows(con, rows):
             "opp_c": {"ga": round(oc["ga_pg"], 2), "rank": oc["ga_rank"], "gp": oc["gp"], "n": n_teams,
                       "c": team_color(oc["ga_rank"], n_teams)} if oc else None,
             "ppt": {"p": _mmss(r["pp_toi"][PREV_SEASON]), "c": _mmss(r["pp_toi"][CUR_SEASON]),
-                    "opk_p": _mmss(r["opp_pk_toi"][PREV_SEASON]), "opk_c": _mmss(r["opp_pk_toi"][CUR_SEASON])},
+                    "opk_p": _mmss(r["opp_pk_toi"][PREV_SEASON]), "opk_c": _mmss(r["opp_pk_toi"][CUR_SEASON]),
+                    "opk_r": _pkr(pkr, r["opp"])},
             "goalie": goalie, "why": [[p, t] for p, t in r["reasons_signed"]],
         })
     return out
 
 
 def _sog_payload(con, date):
+    pkr = _pk_ranks(con)
+    smx = shot_matchups(con, date)
     out = []
     for r in build_sog_rows(con, date):
         tm, _ = _et(r["start"])
@@ -184,7 +202,9 @@ def _sog_payload(con, date):
             "hs": round(r["hit_season"] * 100) if r["hit_season"] is not None else None,
             "toi": {"p": _mmss(r["toi_prev"]), "c": _mmss(r["toi_cur"])},
             "ppt": {"p": _mmss(r["pp_prev"]), "c": _mmss(r["pp_cur"]),
-                    "opk_p": _mmss(_pk(con, r["opp"], PREV_SEASON)), "opk_c": _mmss(_pk(con, r["opp"], CUR_SEASON))},
+                    "opk_p": _mmss(_pk(con, r["opp"], PREV_SEASON)), "opk_c": _mmss(_pk(con, r["opp"], CUR_SEASON)),
+                    "opk_r": _pkr(pkr, r["opp"])},
+            "sm": smx.get(r["team"], {}).get(r["pos_grp"]),
             "opp_p": sa(op), "opp_c": sa(oc, n_teams),
             "att": attinfo(r["att"]), "att5": r["att5"],
             "oa_p": oppatt(r["opp_att"][0], r["att_rank"][PREV_SEASON], r["opp"]),

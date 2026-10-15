@@ -124,6 +124,6 @@ def test_board_template_keeps_its_fields():
     t = (ROOT / "nhl_tim" / "output" / "site_template.html").read_text(encoding="utf8")
     for label in ("PK (shorthanded)", "Preseason projected defence ranking", "Current defence ranking",
                   "Shots against to", "Shot attempts last 5", "Attempt projection", "lineTag(r.line)", "lineTag(r.tline)",
-                  "PP time/G", "TOI/G", "Hit rate", "Opp D", "Shot attempts against", "blocked", "Team matchup ranking", "tmBadge("):
+                  "PP time/G", "TOI/G", "Hit rate", "Opp D", "Shot attempts against", "blocked", "Team matchup ranking", "tmBadge(", "smBadge(", "pkRank("):
         assert label in t, label
     assert t.count("PK (shorthanded)") >= 2  # goal tab and shots tab
