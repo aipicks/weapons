@@ -57,7 +57,7 @@ SOG = {
     "opp_exp": 0.7,       # exponent on opponent shots-against vs league average
     "toi_exp": 0.5,       # exponent on this season's TOI vs last season's (scaled by games played)
     "pace_exp": 0.25,     # exponent on team implied goal total vs 3.0
-    "pp_scale": 0.35,     # extra shots for PP players when the opponent takes many penalties
+    "pp_mult": 1.8,       # a PP minute produces this many times the shots of an even-strength minute (for the shorthanded-time adjustment)
     "nb_r": 8.0,          # negative binomial dispersion (variance = mu + mu^2 / r)
     "market_weight": 0.5, # logit blend weight on the de-vigged market vs the model; 0.5 = model and market equal
 }

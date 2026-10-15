@@ -186,9 +186,20 @@ def build_sog_rows(con, date):
         f_toi = (toi_c / toi_p) ** (SOG["toi_exp"] * wc) if toi_p and toi_c else 1.0
         xg_t = team_xg.get((eid, team))
         f_pace = (xg_t / 3.0) ** SOG["pace_exp"] if xg_t else 1.0
+        # power-play shots: the player's PP time and the opponent's shorthanded time, each blending last season with
+        # this season as the sample grows (this season only is the opponent's current shorthanded-time rank)
         pp_p = _one(con, "SELECT pp_toi_pg FROM player_pp_toi WHERE nhl_id=? AND season=?", pid, PREV_SEASON) or 0.0
+        pp_c = _one(con, "SELECT pp_toi_pg FROM player_pp_toi WHERE nhl_id=? AND season=?", pid, CUR_SEASON)
+        pp_use = (1 - wc) * pp_p + wc * pp_c if pp_c is not None else pp_p
         pk_p = _one(con, "SELECT pk_toi_pg FROM team_pk_toi WHERE team=? AND season=?", opp, PREV_SEASON)
-        f_pp = 1 + SOG["pp_scale"] * (pp_p / 60) * ((pk_p / league_pk - 1) if pk_p and league_pk else 0)
+        pk_c = _one(con, "SELECT pk_toi_pg FROM team_pk_toi WHERE team=? AND season=?", opp, CUR_SEASON)
+        pk_use = ((1 - wo) * pk_p + wo * pk_c) if (pk_p and pk_c is not None and wo) else pk_p
+        # share of his shots that come on the power play, scaled by how much more (or less) shorthanded time this
+        # opponent gives up than the league average
+        toi_use = toi_c or toi_p or 1100.0
+        share = min(max(pp_use / toi_use, 0.0), 0.5)
+        pp_shot_share = share * SOG["pp_mult"] / (1 - share + share * SOG["pp_mult"])
+        f_pp = 1 + pp_shot_share * ((pk_use / league_pk - 1) if pk_use and league_pk else 0)
         # the shots-based rate takes the opponent's shots-allowed-to-this-position factor; the attempt-based rate takes
         # the opponent's attempt volume allowed and its on-target share (blocks and misses). The two are then blended.
         oa_p, oa_c = att_prev.get(opp), att_cur.get(opp)
