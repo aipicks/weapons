@@ -36,12 +36,16 @@ def _prefer_forward(con, team, name, pos=None):
 
 
 def update_power_play_units():
-    """Primary source: powerplayunits.com (measured from NHL shift charts). Falls back to Daily Faceoff if it is down."""
+    """Primary source: Daily Faceoff (matches the units the user follows; powerplayunits.com had SEA's two units
+    swapped). Falls back to powerplayunits.com if Daily Faceoff is down or returns too little."""
     try:
-        return update_from_ppu()
+        res = update_from_dailyfaceoff()
+        if res[1] < 28:  # too few teams: treat the page as incomplete
+            raise RuntimeError(f"only {res[1]} teams")
+        return res
     except Exception as e:
-        print("powerplayunits.com failed, using Daily Faceoff:", e)
-        return update_from_dailyfaceoff()
+        print("Daily Faceoff power-play units failed, using powerplayunits.com:", e)
+        return update_from_ppu()
 
 
 def update_from_ppu():
@@ -121,6 +125,7 @@ def update_from_dailyfaceoff():
         con.execute("INSERT INTO pp_history VALUES(datetime('now'),?,?,?,?)",
                     (pid, r["team"], r["name"], r["unit"]))
     con.execute("INSERT OR REPLACE INTO meta VALUES('last_pp_update', datetime('now'))")
+    con.execute("INSERT OR REPLACE INTO meta VALUES('pp_source', 'dailyfaceoff')")
     con.commit()
     return len(rows), len(teams), unmatched
 

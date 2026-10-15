@@ -1,5 +1,6 @@
 """Daily refresh: current-season skater/goalie stats, games+odds (SGO), projected goalies (RotoWire)."""
 from .posshots import update_pos_shots
+from .powerplay import update_power_play_units
 from .config import ALLOWED_BOOKS, CUR_SEASON, PLAYER_PROP_EXCLUDE
 from .db import connect
 from .normalize import norm_name, norm_team
@@ -282,6 +283,10 @@ def update_daily(date, goalie_source="dailyfaceoff"):
     except Exception as e:
         print("Shots against by position failed:", e)
     update_lines(con)
+    try:
+        update_power_play_units()  # power-play units change often: refresh them every run
+    except Exception as e:
+        print("power-play unit update failed:", e)
     try:
         update_team_mp(con)
     except Exception as e:  # game model degrades gracefully without it
