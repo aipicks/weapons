@@ -77,7 +77,7 @@ GAME = {
 }
 
 # Only these five sportsbooks are ever used (stored, displayed, or priced). Everything else (ESPN BET, Unibet, PointsBet, ...) is dropped at ingest.
-ALLOWED_BOOKS = ("fanduel", "draftkings", "betmgm", "bovada", "caesars")
+ALLOWED_BOOKS = ("fanduel", "draftkings", "betmgm", "caesars")  # Bovada removed on request 2026-10-16
 
 # Team matchup ranking for the Tim Hortons tab: weights on the three ranks, and on the pieces of the defence rank
 MATCHUP = {"goalie": 1 / 3, "xg": 1 / 3, "defense": 1 / 3, "def_cur": 0.4, "def_prev": 0.3, "def_pre": 0.3}
