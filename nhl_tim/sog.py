@@ -163,6 +163,8 @@ def build_sog_rows(con, date):
             gc = a_cur["gp"] if a_cur else 0
             wca = gc / (gc + SOG["cur_k"])
             att_rate = (1 - wca) * prev_a + wca * (a_cur["att"] / gc) if gc else prev_a
+            if len(att5) >= 3:  # recent attempts show a changed role faster than season totals do
+                att_rate = (1 - SOG["att_recent_w"]) * att_rate + SOG["att_recent_w"] * (sum(att5) / len(att5))
             tot_a = sum(x["att"] for x in (a_prev, a_cur) if x)
             tot_s = sum(x["sog"] for x in (a_prev, a_cur) if x)
             ot = (tot_s + po * SOG["ot_k"]) / (tot_a + SOG["ot_k"])

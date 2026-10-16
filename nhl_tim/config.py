@@ -45,7 +45,8 @@ PRESEASON_D = {t: i + 1 for i, t in enumerate(PRESEASON_D_ORDER)}
 # Shots-on-goal model priors (starting values, not fitted)
 SOG = {
     "prior_games": 20,    # shrink last-season shots/game toward the position average
-    "cur_k": 20,          # games before this season's rate outweighs last season's (early-season samples are noisy)
+    "cur_k": 14,          # games before this season's rate outweighs last season's (roles change, but early samples are noisy)
+    "att_recent_w": 0.20, # share of the attempts/game rate taken from the last 5 games' attempts (needs 3+ games)
     "last20_w": 0.5,      # share of last season's rate taken from its final 20 games (recent form) vs the full season
     "last20_k": 10,       # shrinkage games for that last-20 rate toward the position average
     "ot_opp_exp": 0.5,    # exponent on the opponent's on-target share of attempts allowed vs league (blocks/misses)
@@ -87,4 +88,4 @@ MATCHUP = {"goalie": 1 / 3, "xg": 1 / 3, "defense": 1 / 3, "def_cur": 0.4, "def_
 SHOTMATCH = {"att": 0.20, "sog": 0.20, "pos": 0.30, "blk": 0.15, "ot": 0.15}
 
 # Books to ignore for player props (shots, anytime goal) on a given date, e.g. when a book's prop prices look unusable
-PLAYER_PROP_EXCLUDE = {"2026-10-13": ("bovada",)}
+PLAYER_PROP_EXCLUDE = {}  # {"YYYY-MM-DD": ("book", ...)}; Bovada is removed everywhere now
