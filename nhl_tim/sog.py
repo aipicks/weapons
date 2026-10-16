@@ -94,6 +94,10 @@ def build_sog_rows(con, date):
            JOIN player_toi t ON t.nhl_id=s.nhl_id AND t.season=s.season
            WHERE s.season=? AND s.gp>=40 AND t.toi_pg>=(CASE p.pos WHEN 'D' THEN 1080 ELSE 840 END)
            GROUP BY p.pos""", (PREV_SEASON,))}
+    pos_toi = {r["pos"]: r["t"] for r in con.execute(
+        """SELECT p.pos pos, AVG(t.toi_pg) t FROM player_season s JOIN player p USING(nhl_id)
+           JOIN player_toi t ON t.nhl_id=s.nhl_id AND t.season=s.season
+           WHERE s.season=? AND s.gp>=40 AND t.toi_pg>=(CASE p.pos WHEN 'D' THEN 1080 ELSE 840 END) GROUP BY p.pos""", (PREV_SEASON,))}
     att_all = {(r["nhl_id"], r["season"]): r for r in con.execute("SELECT * FROM player_att")}
     pos_att = {r["pos"]: (r["a"], r["o"]) for r in con.execute(
         """SELECT p.pos pos, SUM(a.att) * 1.0 / SUM(a.gp) a, SUM(a.sog) * 1.0 / SUM(a.att) o FROM player_att a
@@ -139,6 +143,11 @@ def build_sog_rows(con, date):
         cur_s, prev_s = _series(pid)
         att5 = last_attempts(pid, _recent_game_ids(pid), 5)
         pos_base = pos_avg.get(p["pos"], 2.0)
+        # role-aware prior: a depth player with little ice time starts below the regulars' average and a first-line
+        # player above it (shots scale with ice time). The current season's TOI shows the role he has now.
+        toi_now = _one(con, "SELECT toi_pg FROM player_toi WHERE nhl_id=? AND season=?", pid, CUR_SEASON) or             _one(con, "SELECT toi_pg FROM player_toi WHERE nhl_id=? AND season=?", pid, PREV_SEASON)
+        role = min(max((toi_now / pos_toi[p["pos"]]) ** SOG["role_exp"], 0.5), 1.4) if toi_now and pos_toi.get(p["pos"]) else 1.0
+        pos_base *= role
 
         # --- projection ---
         k = SOG["prior_games"]
@@ -158,6 +167,7 @@ def build_sog_rows(con, date):
         a_prev, a_cur = att_all.get((pid, PREV_SEASON)), att_all.get((pid, CUR_SEASON))
         if pos_att.get(p["pos"]) and (a_prev or a_cur):
             pa, po = pos_att[p["pos"]]
+            pa *= role
             ka = SOG["att_prior_games"]
             prev_a = (a_prev["att"] + pa * ka) / (a_prev["gp"] + ka) if a_prev else pa
             gc = a_cur["gp"] if a_cur else 0
@@ -259,6 +269,10 @@ def build_sog_rows(con, date):
         p_over, p_under = p_over_nopush * (1 - p_push), (1 - p_over_nopush) * (1 - p_push)
         ev_o, ev_u = _ev(p_over, p_under, ref["over_price"]), _ev(p_under, p_over, ref["under_price"])
         side, p_side, ev, price = ("Over", p_over, ev_o, ref["over_price"]) if ev_o >= ev_u else ("Under", p_under, ev_u, ref["under_price"])
+        n_games = len(cur_s) + len(prev_s)
+        thin = n_games < SOG["min_games"]  # too little history to trust: show the line but never as a +EV pick
+        if thin:
+            ev = min(ev, 0.0)
         book = ref["over_book"] if side == "Over" else ref["under_book"]
 
         # --- hit rates at today's line ---
@@ -291,6 +305,8 @@ def build_sog_rows(con, date):
         if toi_c or toi_p:
             toi = toi_c or toi_p
             reasons.append((0.3, "z", f"{toi/60:.1f} min TOI/G"))
+        if thin:
+            reasons.append((99, "n", f"Only {n_games} career game{'s' if n_games != 1 else ''}: not rated as a pick"))
         reasons.sort(key=lambda r: -r[0])
 
         out.append({

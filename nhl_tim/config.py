@@ -46,6 +46,8 @@ PRESEASON_D = {t: i + 1 for i, t in enumerate(PRESEASON_D_ORDER)}
 SOG = {
     "prior_games": 20,    # shrink last-season shots/game toward the position average
     "cur_k": 14,          # games before this season's rate outweighs last season's (roles change, but early samples are noisy)
+    "role_exp": 0.8,      # exponent on (current TOI / regulars' TOI) that scales the position-average prior
+    "min_games": 3,       # career games needed before a pick is rated (fewer: shown but not ranked as a pick)
     "att_recent_w": 0.20, # share of the attempts/game rate taken from the last 5 games' attempts (needs 3+ games)
     "last20_w": 0.5,      # share of last season's rate taken from its final 20 games (recent form) vs the full season
     "last20_k": 10,       # shrinkage games for that last-20 rate toward the position average
