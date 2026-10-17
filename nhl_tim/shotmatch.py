@@ -22,9 +22,9 @@ def _blend(prev, cur, key):
     return (1 - w) * prev[key] + w * cur[key]
 
 
-def shot_matchups(con, date):
+def shot_matchups(con, date, eids=None):
     """{team: {"F": {...}, "D": {...}}} where the team is the one whose skaters shoot."""
-    games = con.execute("SELECT home, away FROM game WHERE date=?", (date,)).fetchall()
+    games = [g for g in con.execute("SELECT event_id, home, away FROM game WHERE date=?", (date,)) if eids is None or g["event_id"] in eids]
     opp_of = {}
     for g in games:
         opp_of[g["home"]], opp_of[g["away"]] = g["away"], g["home"]

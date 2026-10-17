@@ -82,6 +82,10 @@ GAME = {
 # Only these five sportsbooks are ever used (stored, displayed, or priced). Everything else (ESPN BET, Unibet, PointsBet, ...) is dropped at ingest.
 ALLOWED_BOOKS = ("fanduel", "draftkings", "betmgm", "caesars")  # Bovada removed on request 2026-10-16
 
+# The board only shows games that start at or after this hour (Eastern time, 24h). Earlier games are hidden everywhere
+# (they are still logged and graded). Set to 0 to show every game.
+MIN_START_HOUR_ET = 18
+
 # Team matchup ranking for the Tim Hortons tab: weights on the three ranks, and on the pieces of the defence rank
 MATCHUP = {"goalie": 1 / 3, "xg": 1 / 3, "defense": 1 / 3, "def_cur": 0.4, "def_prev": 0.3, "def_pre": 0.3}
 

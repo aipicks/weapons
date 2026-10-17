@@ -53,6 +53,27 @@ def _gg(pid):
     return _GG[pid]
 
 
+def _late_eids(con, date):
+    """Event ids of the games that start at or after MIN_START_HOUR_ET (Eastern)."""
+    from ..config import MIN_START_HOUR_ET
+    out = set()
+    for g in con.execute("SELECT event_id, start_utc FROM game WHERE date=?", (date,)):
+        if _et(g["start_utc"])[1].hour >= MIN_START_HOUR_ET:
+            out.add(g["event_id"])
+    return out
+
+
+def _renumber(rows, by_pool):
+    """Re-rank rows 1..N (within each pool when by_pool) after hidden games were removed, keeping their order."""
+    groups = {}
+    for r in rows:
+        groups.setdefault(r.get("pool") if by_pool else None, []).append(r)
+    for g in groups.values():
+        g.sort(key=lambda r: r["rank"])
+        for i, r in enumerate(g):
+            r["rank"], r["pool_n"] = i + 1, len(g)
+
+
 def _pk_ranks(con):
     """{team: (rank, n)} for this season's shorthanded time per game, 1 = the most."""
     rows = con.execute("SELECT team FROM team_pk_toi WHERE season=? ORDER BY pk_toi_pg DESC", (CUR_SEASON,)).fetchall()
@@ -149,11 +170,14 @@ def _rows(con, rows):
     return out
 
 
-def _sog_payload(con, date):
+def _sog_payload(con, date, eids=None):
     pkr = _pk_ranks(con)
-    smx = shot_matchups(con, date)
+    smx = shot_matchups(con, date, eids)
     out = []
-    for r in build_sog_rows(con, date):
+    sog_rows = [r for r in build_sog_rows(con, date) if eids is None or r["event_id"] in eids]
+    for i_, r_ in enumerate(sog_rows):  # keep the numbering 1..N now that hidden games are gone
+        r_["rank"], r_["n"] = i_ + 1, len(sog_rows)
+    for r in sog_rows:
         tm, _ = _et(r["start"])
         n_teams = con.execute("SELECT COUNT(*) FROM team_season WHERE season=?", (CUR_SEASON,)).fetchone()[0]
         op, oc = r["opp_prev"], r["opp_cur"]
@@ -220,7 +244,7 @@ def _sog_payload(con, date):
     return out
 
 
-def _games_payload(con, date):
+def _games_payload(con, date, eids=None):
     def f1(x, d=1):
         return None if x is None else round(x, d)
 
@@ -230,6 +254,8 @@ def _games_payload(con, date):
                                    "ev": round(c["ev"] * 100, 1)}
     out = []
     for g in build_game_rows(con, date):
+        if eids is not None and g["eid"] not in eids:
+            continue
         tm, _ = _et(g["start"])
 
         def gl(row):
@@ -267,8 +293,8 @@ def _games_payload(con, date):
     return out
 
 
-def _safest_payload(con, date):
-    rows = build_game_rows(con, date)
+def _safest_payload(con, date, eids=None):
+    rows = [g for g in build_game_rows(con, date) if eids is None or g["eid"] in eids]
     c = best_value_pick(rows)
     if not c:
         return None
@@ -289,12 +315,14 @@ def _backup(con, team, starter_id):
     return {"name": b["name"], "depth": b["depth"], "p": prev, "c": cur}
 
 
-def _goalie_panel(con, date):
+def _goalie_panel(con, date, eids=None):
     """Every game's two starting goalies with status and last-season / this-season numbers."""
     out = []
     from ..games import b2b_teams
     b2b = b2b_teams(date)
     for g in con.execute("SELECT * FROM game WHERE date=? ORDER BY start_utc, event_id", (date,)):
+        if eids is not None and g["event_id"] not in eids:
+            continue
         tm, _ = _et(g["start_utc"])
         sides = []
         for team in (g["away"], g["home"]):
@@ -314,12 +342,16 @@ def _goalie_panel(con, date):
 
 def build_site(date):
     con = connect()
+    late = _late_eids(con, date)
     rows, missing = build_rows(con, date)
+    rows = [r for r in rows if r["event_id"] in late]
+    _renumber(rows, True)
     all_rows, _ = build_rows(con, date, all_players=True)
+    all_rows = [r for r in all_rows if r["event_id"] in late]
     all_rows = sorted([r for r in all_rows if r["ev"] is not None and r["p"] >= MIN_P_ALL], key=lambda r: r["rank"])[:TOP_N_ALL]
     for i_, r_ in enumerate(all_rows):  # renumber 1..N now that the list is filtered
         r_["rank"], r_["pool_n"] = i_ + 1, len(all_rows)
-    matchups = team_matchups(con, date)
+    matchups = team_matchups(con, date, late)
     _TM.clear()
     _TM.update({m["team"]: m for m in matchups})
     meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
@@ -329,7 +361,7 @@ def build_site(date):
                             "goalie": m["goalie"], "status": m["status"], "gf": round((m["gf"] - 1) * 100, 1), "r_goalie": m["r_goalie"],
                             "xg": round(m["xg"], 2), "r_xg": m["r_xg"], "r_def": m["r_def"], "def": round(m["def_score"], 1),
                             "score": round(m["score"], 1)} for m in matchups],
-               "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date), "sog": _sog_payload(con, date), "games": _games_payload(con, date), "safe": _safest_payload(con, date), "results": _results(con)}
+               "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, late), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")

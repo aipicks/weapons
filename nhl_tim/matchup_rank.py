@@ -17,7 +17,7 @@ def _rank_desc(vals):
     return {k: i + 1 for i, k in enumerate(order)}
 
 
-def team_matchups(con, date):
+def team_matchups(con, date, eids=None):
     cd = current_defense(con)
     prev = {r["team"]: r["ga_rank"] for r in con.execute("SELECT team, ga_rank FROM team_season WHERE season=?", (PREV_SEASON,))}
 
@@ -35,6 +35,8 @@ def team_matchups(con, date):
 
     ent = {}
     for g in build_game_rows(con, date):
+        if eids is not None and g["eid"] not in eids:
+            continue
         for team, opp, calc, og in ((g["home"], g["away"], g["h"], g["goalie_away"]), (g["away"], g["home"], g["a"], g["goalie_home"])):
             f = _goalie_factor(con, og["goalie_id"], og["status"], None) if og else 1.0
             ent[team] = {"team": team, "opp": opp, "home": team == g["home"], "xg": calc["xg"], "gf": f,
