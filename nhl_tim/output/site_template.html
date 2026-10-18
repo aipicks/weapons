@@ -150,7 +150,7 @@ h1 span{color:var(--accent)}
         <option value="toip">TOI/G · last season</option><option value="toic">TOI/G · this season</option><option value="toib">TOI/G · combined</option>
         <option value="pkp">Opp shorthanded time · last season</option><option value="pkc">Opp shorthanded time · this season</option><option value="pkb">Opp shorthanded time · combined</option>
         <option value="line">Line / pair</option><option value="odds">Anytime goal odds</option>
-        <option value="tm">Team matchup rank (opposing goalie + team xG + opposing defence)</option></select>
+        <option value="tm">Team matchup score (opposing goalie + team offence + opposing defence)</option></select>
       <button class="chip" id="f-dir" aria-pressed="false">High → low</button>
     </div>
     <div class="tools">
@@ -205,8 +205,8 @@ const smBadge = t => { if (!t) return '';
   const c = t.rank <= t.n/3 ? 'good' : t.rank > 2*t.n/3 ? 'bad' : 'warn';
   return `<span class="tmx ${c}" title="Shots matchup: opponent attempts, shots, shots to this position, blocks, on-target share allowed">SHOTS<b>#${t.rank}</b>${t.score.toFixed(1)}</span>`; };
 const tmBadge = t => { if (!t) return '';
-  const c = t.rank <= t.n/3 ? 'good' : t.rank > 2*t.n/3 ? 'bad' : 'warn';
-  return `<span class="tmx ${c}" title="Team matchup: opposing goalie + team xG + opposing defence">TEAM<b>#${t.rank}</b>${t.score}</span>`; };
+  const c = t.score >= 3 ? 'good' : t.score < 2 ? 'bad' : 'warn';
+  return `<span class="tmx ${c}" title="Team matchup score, 1 to 4 (4 = best): opposing goalie + team offence + opposing defence">TEAM<b>${t.score.toFixed(1)}</b>of 4</span>`; };
 function row(r){
   const [ppt, ppc] = PP[r.pp];
   const g = r.goalie ? GL[r.goalie.status] : ['G: Unconfirmed','bad'];
@@ -379,8 +379,9 @@ function matchupTable(){
   const M = D.matchups || [];
   if (!M.length) return '';
   const st = {Confirmed:'confirmed', Likely:'likely', Unconfirmed:'unconfirmed'};
-  const rowsH = M.map(m => `<tr><td>${m.rank}</td><td><b>${m.team}</b> ${m.home?'vs':'@'} ${m.opp}</td><td>${esc(m.goalie||'?')} <small>(${st[m.status]||'?'}, ${m.gf>0?'+':''}${m.gf}% goals vs xG)</small> <b>#${m.r_goalie}</b></td><td>${m.xg} <b>#${m.r_xg}</b></td><td>${m.opp} <b>#${m.r_def}</b></td><td>${m.score}</td></tr>`).join('');
-  return `<div class="gtop"><h3>Team matchup ranking</h3><p class="note">1 = best spot for that team's skaters. Total = average of three ranks: the opposing goalie (weaker is better), the team's expected goals, and the opposing defence (current defence, last season, preseason). Each pool below is sorted by this.</p><table class="mt"><tr><th>#</th><th>Team</th><th>Opposing goalie (#1 = weakest)</th><th>Team xG (#1 = most)</th><th>Opposing defence (#1 = weakest)</th><th>Score</th></tr>${rowsH}</table></div>`;
+  const sc = s => s >= 3 ? 'good' : s < 2 ? 'bad' : 'warn';
+  const rowsH = M.map(m => `<tr><td><span class="tag ${sc(m.score)} pptag"><b>${m.score.toFixed(1)}</b></span></td><td><b>${m.team}</b> ${m.home?'vs':'@'} ${m.opp}</td><td>${esc(m.goalie||'?')} <small>(${st[m.status]||'?'}, ${m.gf>0?'+':''}${m.gf}% goals vs xG)</small> <b>${m.p_goalie}%</b></td><td>${m.off==null?'?':m.off} xGF/G <b>${m.p_off}%</b></td><td>${m.opp} rank ${m.def} <b>${m.p_def}%</b></td></tr>`).join('');
+  return `<div class="gtop"><h3>Team matchup score</h3><p class="note">Each team gets a score from 1 to 4 (4 = best spot for its skaters), judged against the whole league, not against today's other games. It averages three percentages: how weak the opposing goalie is, how strong the team's own offence is, and how weak the opposing defence is (current defence, last season and preseason). Each pool below is sorted by this score.</p><table class="mt"><tr><th>Score</th><th>Team</th><th>Opposing goalie (weakness percentile)</th><th>Team offence (percentile)</th><th>Opposing defence (weakness percentile)</th></tr>${rowsH}</table></div>`;
 }
 function render(){
   if (view === 'games') return renderGames();

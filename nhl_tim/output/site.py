@@ -136,7 +136,7 @@ def _rows(con, rows):
               "toip": r["toi_prev"], "toic": r["toi_cur"], "toib": wavg(r["toi_prev"], gp25, r["toi_cur"], gp26),
               "pkp": pk_p, "pkc": pk_c, "pkb": wavg(pk_p, 82, pk_c, oc_gp),
               "line": {"F1": 1, "F2": 2, "F3": 3, "F4": 4, "D1": 5, "D2": 6, "D3": 7}.get(line),
-              "tm": (_TM[r["team"]]["n"] + 1 - _TM[r["team"]]["rank"]) if r["team"] in _TM else None,
+              "tm": round(_TM[r["team"]]["score"], 2) if r["team"] in _TM else None,
               "odds": a["implied"] if a else None}
         goalie = None
         if gp and gp["goalie_name"]:
@@ -149,7 +149,7 @@ def _rows(con, rows):
             "name": r["name"], "team": r["team"], "opp": r["opp"], "pos": r["pos"], "chg": r["team_changed"],
             "p": round(r["p"] * 100, 1), "pm": round(r["p_mkt"] * 100, 1) if r["p_mkt"] else None,
             "pp": r["pp_unit"], "ev": ev, "edge": edge, "line": line, "sk": sk,
-            "tm": {"rank": _TM[r["team"]]["rank"], "n": _TM[r["team"]]["n"], "score": round(_TM[r["team"]]["score"], 1)} if r["team"] in _TM else None,
+            "tm": {"score": round(_TM[r["team"]]["score"], 1)} if r["team"] in _TM else None,
             "any": {"am": fmt_american(a["american"]), "pr": round(a["implied"] * 100, 1)} if a else None,
             "game": game, "xg": round(r["xg"], 2) if r["xg"] is not None else None,
             "s25": {"toi": _mmss(r["toi_prev"]), "gp": prev["gp"], "g": prev["g"], "sog": prev["sog"], "gg": prev["goal_games"],
@@ -357,9 +357,10 @@ def build_site(date):
     meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
             for k in ("last_pp_update", "daily_updated")}
     payload = {"date": date, "rows": _rows(con, rows), "all": _rows(con, all_rows), "meta": meta,
-               "matchups": [{"rank": m["rank"], "team": m["team"], "opp": m["opp"], "home": m["home"],
-                            "goalie": m["goalie"], "status": m["status"], "gf": round((m["gf"] - 1) * 100, 1), "r_goalie": m["r_goalie"],
-                            "xg": round(m["xg"], 2), "r_xg": m["r_xg"], "r_def": m["r_def"], "def": round(m["def_score"], 1),
+               "matchups": [{"team": m["team"], "opp": m["opp"], "home": m["home"],
+                            "goalie": m["goalie"], "status": m["status"], "gf": round((m["gf"] - 1) * 100, 1), "p_goalie": round(m["p_goalie"] * 100),
+                            "off": round(m["off"], 2) if m["off"] is not None else None, "p_off": round(m["p_off"] * 100),
+                            "def": round(m["def_score"], 1), "p_def": round(m["p_def"] * 100),
                             "score": round(m["score"], 1)} for m in matchups],
                "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, late), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
