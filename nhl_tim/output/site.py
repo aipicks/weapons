@@ -74,6 +74,17 @@ def _renumber(rows, by_pool):
             r["rank"], r["pool_n"] = i + 1, len(g)
 
 
+def _team_goals(con):
+    """{(team, season): {gpg, xgpg, rank, n, gp}} goals and expected goals scored per game, 1 = most goals."""
+    out = {}
+    for season in (PREV_SEASON, CUR_SEASON):
+        rows = con.execute("SELECT team, gp, gf, xgf FROM team_mp WHERE season=? AND sit='all' AND gp>0 ORDER BY gf*1.0/gp DESC", (season,)).fetchall()
+        for i, r in enumerate(rows):
+            out[(r["team"], season)] = {"gpg": round(r["gf"] / r["gp"], 2), "xgpg": round(r["xgf"] / r["gp"], 2), "rank": i + 1,
+                                        "n": len(rows), "gp": r["gp"], "c": team_color(len(rows) + 1 - (i + 1), len(rows))}
+    return out
+
+
 def _pk_ranks(con):
     """{team: (rank, n)} for this season's shorthanded time per game, 1 = the most."""
     rows = con.execute("SELECT team FROM team_pk_toi WHERE season=? ORDER BY pk_toi_pg DESC", (CUR_SEASON,)).fetchall()
@@ -89,6 +100,7 @@ def _pkr(ranks, team):
 
 def _rows(con, rows):
     pkr = _pk_ranks(con)
+    tgoals = _team_goals(con)
     out = []
     for r in rows:
         tm, _ = _et(r["start"])
@@ -162,6 +174,7 @@ def _rows(con, rows):
                         "c": team_color(PRESEASON_D[r["opp"]])},
             "opp_c": {"ga": round(oc["ga_pg"], 2), "rank": oc["ga_rank"], "gp": oc["gp"], "n": n_teams,
                       "c": team_color(oc["ga_rank"], n_teams)} if oc else None,
+            "tg": {"p": tgoals.get((r["team"], PREV_SEASON)), "c": tgoals.get((r["team"], CUR_SEASON))},
             "ppt": {"p": _mmss(r["pp_toi"][PREV_SEASON]), "c": _mmss(r["pp_toi"][CUR_SEASON]),
                     "opk_p": _mmss(r["opp_pk_toi"][PREV_SEASON]), "opk_c": _mmss(r["opp_pk_toi"][CUR_SEASON]),
                     "opk_r": _pkr(pkr, r["opp"])},
