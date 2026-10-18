@@ -127,3 +127,15 @@ def test_board_template_keeps_its_fields():
                   "PP time/G", "TOI/G", "Hit rate", "Opp D", "Shot attempts against", "blocked", "Team matchup score", "Team goals", "tmBadge(", "smBadge(", "pkRank("):
         assert label in t, label
     assert t.count("PK (shorthanded)") >= 2  # goal tab and shots tab
+
+
+def test_ppg_share_of_goals():
+    import sqlite3
+    from nhl_tim.output import site
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE player_ppg(nhl_id INTEGER, season INTEGER, pp_goals INTEGER)")
+    con.execute("INSERT INTO player_ppg VALUES(1, 20252026, 9)")
+    assert site._ppg(con, 1, 20252026, 30) == {"pp": 9, "g": 30, "pct": 30}
+    assert site._ppg(con, 1, 20252026, 0)["pct"] is None   # no goals: no percentage
+    assert site._ppg(con, 2, 20252026, 5) is None          # unknown player

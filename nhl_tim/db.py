@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS player_toi(
   nhl_id INTEGER, season INTEGER, toi_pg REAL, PRIMARY KEY(nhl_id, season));
 CREATE TABLE IF NOT EXISTS player_pp_toi(
   nhl_id INTEGER, season INTEGER, pp_toi_pg REAL, PRIMARY KEY(nhl_id, season));
+CREATE TABLE IF NOT EXISTS player_ppg(
+  nhl_id INTEGER, season INTEGER, pp_goals INTEGER, PRIMARY KEY(nhl_id, season));
 CREATE TABLE IF NOT EXISTS team_pk_toi(
   team TEXT, season INTEGER, pk_toi_pg REAL, PRIMARY KEY(team, season));
 CREATE TABLE IF NOT EXISTS odds_sog(

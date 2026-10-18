@@ -91,6 +91,14 @@ def _pk_ranks(con):
     return {r["team"]: (i + 1, len(rows)) for i, r in enumerate(rows)}
 
 
+def _ppg(con, nhl_id, season, goals):
+    """Power-play goals for one season and the share of the player's goals that came on the power play (None if unknown)."""
+    r = con.execute("SELECT pp_goals FROM player_ppg WHERE nhl_id=? AND season=?", (nhl_id, season)).fetchone()
+    if r is None or goals is None:
+        return None
+    return {"pp": r["pp_goals"], "g": goals, "pct": round(r["pp_goals"] / goals * 100) if goals else None}
+
+
 def _pkr(ranks, team):
     if team not in ranks:
         return None
@@ -175,6 +183,7 @@ def _rows(con, rows):
             "opp_c": {"ga": round(oc["ga_pg"], 2), "rank": oc["ga_rank"], "gp": oc["gp"], "n": n_teams,
                       "c": team_color(oc["ga_rank"], n_teams)} if oc else None,
             "tg": {"p": tgoals.get((r["team"], PREV_SEASON)), "c": tgoals.get((r["team"], CUR_SEASON))},
+            "ppg": {"p": _ppg(con, r["nhl_id"], PREV_SEASON, prev["g"] if prev else None), "c": _ppg(con, r["nhl_id"], CUR_SEASON, cur["g"] if cur else 0)},
             "ppt": {"p": _mmss(r["pp_toi"][PREV_SEASON]), "c": _mmss(r["pp_toi"][CUR_SEASON]),
                     "opk_p": _mmss(r["opp_pk_toi"][PREV_SEASON]), "opk_c": _mmss(r["opp_pk_toi"][CUR_SEASON]),
                     "opk_r": _pkr(pkr, r["opp"])},

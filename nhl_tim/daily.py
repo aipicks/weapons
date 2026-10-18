@@ -232,6 +232,8 @@ def update_pp_time(con):
             if r.get("ppTimeOnIcePerGame") is not None:
                 con.execute("INSERT OR REPLACE INTO player_pp_toi VALUES(?,?,?)",
                             (r["playerId"], season, r["ppTimeOnIcePerGame"]))
+            if r.get("ppGoals") is not None:   # power-play goals (official NHL stats); goals share is computed on the board
+                con.execute("INSERT OR REPLACE INTO player_ppg VALUES(?,?,?)", (r["playerId"], season, r["ppGoals"]))
         for r in nhl_api.team_penaltykill(season, force):
             n = r["teamFullName"]
             if n in abbr and r.get("pkTimeOnIcePerGame") is not None and r["gamesPlayed"] > 0:
