@@ -122,11 +122,11 @@ def test_board_template_keeps_its_fields():
     """The page template must keep every stat the user relies on (guards against silently dropping one)."""
     from nhl_tim.config import ROOT
     t = (ROOT / "nhl_tim" / "output" / "site_template.html").read_text(encoding="utf8")
-    for label in ("PK (shorthanded)", "Preseason projected defence ranking", "Current defence ranking",
+    for label in ("PK time", "PP goals", "Preseason projected defence ranking", "Current defence ranking",
                   "Shots against to", "Shot attempts last 5", "Attempt projection", "lineTag(r.line)", "lineTag(r.tline)",
-                  "PP time/G", "TOI/G", "Hit rate", "Opp D", "Shot attempts against", "blocked", "Team matchup score", "Team goals", "tmBadge(", "smBadge(", "pkRank("):
+                  "PP time", "TOI/G", "Hit rate", "Opp D", "Shot attempts against", "blocked", "Team matchup score", "Team goals", "tmBadge(", "smBadge(", "pkRank("):
         assert label in t, label
-    assert t.count("PK (shorthanded)") >= 2  # goal tab and shots tab
+    assert t.count("PK time") >= 2  # goal tab and shots tab
 
 
 def test_ppg_share_of_goals():
