@@ -30,7 +30,7 @@ def _count(n_games):
     return 2 if n_games <= 3 else 3 if n_games <= 6 else 4 if n_games <= 9 else 5
 
 
-def _why(r, side, ln, p, hit, opp_goalie):
+def _why(r, side, ln, p, hit, opp_goalie, n_books=2):
     """Plain-language reasons this leg should win, then the main risks."""
     over = side == "Over"
     l5 = r["last5"]
@@ -69,6 +69,8 @@ def _why(r, side, ln, p, hit, opp_goalie):
         risk.append(f"Missed this line in {len(misses)} of his last 5 ({', '.join(str(x) for x in misses)} shots).")
     if opp_goalie and opp_goalie[1] != "Confirmed":
         risk.append(f"{opp_goalie[0]} is not confirmed in net yet; recheck before the game.")
+    if n_books < 2:
+        risk.append("Only one book lists this line in our feed. Confirm it is still on the app before you bet; if it is gone, skip the parlay.")
     risk.append(f"Our chance for this leg is {p*100:.0f}%, so about {100-p*100:.0f}% of the time it loses.")
     return why, risk
 
@@ -143,7 +145,7 @@ def build_parlays(con, date):
         legs_out = []
         for x in (a, b):
             r = x["r"]
-            why, risk = _why(r, x["side"], x["line"], x["p"], x["hit"], x["goalie"])
+            why, risk = _why(r, x["side"], x["line"], x["p"], x["hit"], x["goalie"], len(x["books"]))
             t = et(r["start"])
             legs_out.append({"pid": x["pid"], "name": r["name"], "team": r["team"], "opp": r["opp"], "game": x["game"],
                              "time": t.strftime("%I:%M %p").lstrip("0"), "side": x["side"], "line": x["line"],
