@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS team_pk_toi(
 CREATE TABLE IF NOT EXISTS odds_sog(
   event_id TEXT, nhl_id INTEGER, player TEXT, team TEXT, opp TEXT, book TEXT, line REAL,
   over_price REAL, under_price REAL, ts TEXT, PRIMARY KEY(event_id, player, book));
+CREATE TABLE IF NOT EXISTS odds_sog_alt(
+  event_id TEXT, nhl_id INTEGER, player TEXT, book TEXT, side TEXT, line REAL, price REAL,
+  PRIMARY KEY(event_id, nhl_id, book, side, line));
 CREATE TABLE IF NOT EXISTS player_line(
   nhl_id INTEGER PRIMARY KEY, team TEXT, grp TEXT, name TEXT);
 CREATE TABLE IF NOT EXISTS team_mp(

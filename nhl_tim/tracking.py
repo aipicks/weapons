@@ -53,6 +53,18 @@ def snapshot(con, date):
              game=f"{r['away']} @ {r['home']}", side=r["side"], line=r["line"], price=r["price"], book=r["book"],
              p=r["p_over"], p_mkt=r["fair_over"], p_model=None, ev=r["ev"], extra=json.dumps({"mu": r["mu"], "best_p": r["p"]}))
         n += 1
+    # ---- the daily two-leg shots parlays: one row per leg, grouped by the parlay number in `extra` ----
+    from .parlays import build_parlays
+    import datetime as _dt
+    _now = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M")
+    con.execute("DELETE FROM pred_log WHERE date=? AND kind='parlay_leg' AND settled=0 AND start>?", (date, _now))  # drop stale picks
+    for par in build_parlays(con, date)["parlays"]:
+        for leg in par["legs"]:
+            _put(con, date, "parlay_leg", f"{leg['pid']}:{par['n']}", leg["start"], name=leg["name"], team=leg["team"],
+                 opp=leg["opp"], game=leg["game"], side=leg["side"], line=leg["line"], price=leg["price"], book=leg["book"],
+                 p=leg["p"] / 100, ev=par["ev"] / 100,
+                 extra=json.dumps({"parlay": par["n"], "parlay_price": par["price"], "parlay_p": par["p"]}))
+            n += 1
     # ---- games: probability rows (calibration) and the best-bet rows (profit) ----
     grows = build_game_rows(con, date)
     for g in grows:
@@ -154,7 +166,7 @@ def _result(kind, row, game, box):
         return None, None
     if kind == "goal":
         return (1.0 if pl["goals"] > 0 else 0.0), pl["goals"]
-    if kind == "sog":
+    if kind in ("sog", "parlay_leg"):
         if pl["sog"] == row["line"]:
             return 0.5, pl["sog"]
         over = pl["sog"] > row["line"]
@@ -183,7 +195,7 @@ def settle(con):
             if ev_id not in by_event:
                 continue
             g, fin = by_event[ev_id]
-            if row["kind"] in ("goal", "sog") and fin["gid"] not in boxes:
+            if row["kind"] in ("goal", "sog", "parlay_leg") and fin["gid"] not in boxes:
                 boxes[fin["gid"]] = _players(fin["gid"])
             ml_row = dict(row)
             if row["kind"] in ("ml_bet",):

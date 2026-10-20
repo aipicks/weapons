@@ -97,6 +97,7 @@ def ingest_slate(con, date, force=True):
                         (eid, b, hb.get("lastUpdatedAt"), float(hb["spread"]), float(hb["odds"]), float(ab["spread"]), float(ab["odds"])))
         con.execute("DELETE FROM odds_atg WHERE event_id=?", (eid,))
         con.execute("DELETE FROM odds_sog WHERE event_id=?", (eid,))
+        con.execute("DELETE FROM odds_sog_alt WHERE event_id=?", (eid,))
         for oid, x in o.items():  # player shots-on-goal over/under lines
             if not (oid.startswith("shots_onGoal-") and oid.endswith("-game-ou-over")):
                 continue
@@ -118,6 +119,26 @@ def ingest_slate(con, date, force=True):
                 con.execute("INSERT OR REPLACE INTO odds_sog VALUES(?,?,?,?,?,?,?,?,?,?)",
                             (eid, pid_, pinfo["name"], team_, opp_, b, float(bo["overUnder"]),
                              float(bo["odds"]), float(ub["odds"]), bo.get("lastUpdatedAt")))
+        for oid, x in o.items():  # every shots line incl. alternates, both sides, for the daily parlays
+            if not (oid.startswith("shots_onGoal-") and oid.endswith("-game-ou-over")):
+                continue
+            pinfo = e.get("players", {}).get(x.get("playerID"))
+            tid_ = {e["teams"]["home"]["teamID"]: (h, a), e["teams"]["away"]["teamID"]: (a, h)}
+            if not pinfo or not pinfo.get("name") or pinfo.get("teamID") not in tid_:
+                continue
+            pid_ = _find_player(con, tid_[pinfo["teamID"]][0], pinfo["name"])
+            if pid_ is None:
+                continue
+            for side, src in (("Over", x), ("Under", o.get(oid.replace("-over", "-under"), {}))):
+                for b, bo in src.get("byBookmaker", {}).items():
+                    if b not in ALLOWED_BOOKS or b in PLAYER_PROP_EXCLUDE.get(date, ()):
+                        continue
+                    for ln, od, av in [(bo.get("overUnder"), bo.get("odds"), bo.get("available", True))] + \
+                            [(al.get("overUnder"), al.get("odds"), al.get("available", True)) for al in bo.get("altLines", [])]:
+                        if ln is None or od is None or av is False:
+                            continue
+                        con.execute("INSERT OR REPLACE INTO odds_sog_alt VALUES(?,?,?,?,?,?,?)",
+                                    (eid, pid_, pinfo["name"], b, side, float(ln), float(od)))
         tid = {e["teams"]["home"]["teamID"]: (h, a), e["teams"]["away"]["teamID"]: (a, h)}
         for oid, x in o.items():
             if not (oid.startswith("points-") and oid.endswith("-game-yn-yes")):

@@ -10,6 +10,7 @@ from ..sog import build_sog_rows
 from ..games import build_game_rows, best_value_pick
 from ..matchup_rank import team_matchups
 from ..shotmatch import shot_matchups
+from ..parlays import build_parlays
 
 _TM = {}  # team -> matchup entry for the slate being built (set in build_site)
 from ..tracking import results as _results
@@ -315,6 +316,26 @@ def _games_payload(con, date, eids=None):
     return out
 
 
+def _parlay_history(con, date):
+    """Settled and open parlays from the last 14 days (before today), newest first, from the logged legs."""
+    out = {}
+    for r in con.execute("SELECT * FROM pred_log WHERE kind='parlay_leg' AND date<? ORDER BY date DESC", (date,)):
+        info = json.loads(r["extra"] or "{}")
+        k = (r["date"], info.get("parlay"))
+        p = out.setdefault(k, {"date": r["date"], "n": info.get("parlay"), "price": info.get("parlay_price"), "legs": []})
+        p["legs"].append({"name": r["name"], "side": r["side"], "line": r["line"], "price": fmt_american(r["price"]),
+                          "book": r["book"], "outcome": r["outcome"], "actual": r["actual"], "settled": r["settled"]})
+    res = []
+    for k in sorted(out, reverse=True)[:60]:
+        p = out[k]
+        oc = [leg["outcome"] for leg in p["legs"]]
+        p["result"] = ("open" if any(o is None for o in oc) else "W" if all(o in (1.0, 0.5) for o in oc) and any(o == 1.0 for o in oc)
+                       else "push" if all(o == 0.5 for o in oc) else "L")
+        res.append(p)
+    wl = [p["result"] for p in res]
+    return {"rows": res, "w": wl.count("W"), "l": wl.count("L")}
+
+
 def _safest_payload(con, date, eids=None):
     rows = [g for g in build_game_rows(con, date) if eids is None or g["eid"] in eids]
     c = best_value_pick(rows)
@@ -384,7 +405,7 @@ def build_site(date):
                             "off": round(m["off"], 2) if m["off"] is not None else None, "p_off": round(m["p_off"] * 100),
                             "def": round(m["def_score"], 1), "p_def": round(m["p_def"] * 100),
                             "score": round(m["score"], 1)} for m in matchups],
-               "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, late), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
+               "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, late), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")

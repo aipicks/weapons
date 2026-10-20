@@ -21,7 +21,8 @@ def fetch_slate(date, force=True):
     if f.exists() and not force:
         return json.loads(f.read_text())
     d = datetime.fromisoformat(date).replace(tzinfo=timezone.utc)
-    params = {"leagueID": "NHL", "oddsAvailable": "true", "limit": 50,
+    params = {"leagueID": "NHL", "oddsAvailable": "true", "limit": 50, "includeAltLines": "true",
+              "bookmakerID": "fanduel,draftkings,betmgm,caesars",
               "startsAfter": (d + timedelta(hours=9)).strftime("%Y-%m-%dT%H:%M:%SZ"),
               "startsBefore": (d + timedelta(hours=33)).strftime("%Y-%m-%dT%H:%M:%SZ")}
     events, cursor = [], None
