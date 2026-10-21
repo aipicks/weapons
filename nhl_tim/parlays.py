@@ -2,7 +2,7 @@
 
 Each leg is a main or alternate shots line (2+ shot overs, or unders) from FanDuel, DraftKings, BetMGM or Caesars, priced between
 about -350 and -160, that the player has hit in at least 4 of his last 5 games and that our model puts at 60% or better.
-Two legs from different games are paired so the parlay pays between about -120 and +112. Between 2 and 5 parlays are
+Two legs from different games at the SAME sportsbook are paired so the parlay pays between about -120 and +112. Between 2 and 5 parlays are
 shown, depending on the size of the slate and on how many pairs pass, best expected value first, no player twice.
 
 Only games that start at or after config.MIN_START_HOUR_ET and have not started are used."""
@@ -11,7 +11,7 @@ import itertools
 
 from .config import MIN_START_HOUR_ET, SOG
 from .model import logit, sigmoid
-from .sog import build_sog_rows, over_under_push
+from .sog import _series, build_sog_rows, over_under_push
 
 DEC_LO, DEC_HI = 1.28, 1.62        # leg price window: -350 .. -160
 PAR_LO, PAR_HI = 1.83, 2.13        # parlay price window: -120 .. +113
@@ -94,22 +94,20 @@ def build_parlays(con, date):
                                   "JOIN game g ON g.event_id=p.event_id WHERE g.date=?", (date,)):
         goalies[(g, t)] = (n, s)
 
+    eids = list({r["event_id"] for r in rows.values()})
+    qs = ",".join("?" * len(eids))
+    mainlines = {(m["nhl_id"], m["book"], m["line"]) for m in con.execute(
+        "SELECT nhl_id, book, line FROM odds_sog WHERE event_id IN (%s)" % qs, eids)}
     best = {}
-    for a in con.execute("SELECT nhl_id, book, side, line, price FROM odds_sog_alt WHERE event_id IN (%s)" %
-                         ",".join("?" * len({r["event_id"] for r in rows.values()})), list({r["event_id"] for r in rows.values()})):
+    for a in con.execute("SELECT nhl_id, book, side, line, price FROM odds_sog_alt WHERE event_id IN (%s)" % qs, eids):
         if a["nhl_id"] in rows:
-            k = (a["nhl_id"], a["side"], a["line"])
-            best.setdefault(k, []).append((a["price"], a["book"]))
+            best.setdefault((a["nhl_id"], a["side"], a["line"]), []).append((a["price"], a["book"]))
     legs = []
     for (pid, side, ln), plist in best.items():
         plist = sorted(plist, reverse=True)  # best price first
-        price, book = plist[0]
         r = rows[pid]
-        d = _dec(price)
         # the user's style: 2+ shots overs (over 1.5), or unders on 1.5 / 2.5 / 3.5. No 1+ shot (0.5) overs, no 3+ shot overs.
         if not ((side == "Over" and ln == 1.5) or (side == "Under" and ln in (1.5, 2.5, 3.5))):
-            continue
-        if not DEC_LO <= d <= DEC_HI:
             continue
         mo = over_under_push(r["mu"], ln, SOG["nb_r"])
         mk = over_under_push(r["mu_market"], ln, SOG["nb_r"])
@@ -121,16 +119,24 @@ def build_parlays(con, date):
         if p < MIN_P or hit < MIN_HIT:
             continue
         game = f"{r['away']} @ {r['home']}"
-        legs.append({"pid": pid, "r": r, "side": side, "line": ln, "price": price, "book": book, "p": p, "d": d,
-                     "hit": hit, "game": game, "goalie": goalies.get((game, r["opp"])), "books": plist})
+        for price, book in plist:  # one leg per book: both legs of a parlay must be at the same book
+            d = _dec(price)
+            if not DEC_LO <= d <= DEC_HI:
+                continue
+            if side == "Under" and (pid, book, ln) not in mainlines:
+                continue  # alternate unders are often missing from the app: only use an under that is the book's own main line
+            legs.append({"pid": pid, "r": r, "side": side, "line": ln, "price": price, "book": book, "p": p, "d": d,
+                         "hit": hit, "game": game, "goalie": goalies.get((game, r["opp"])), "books": plist,
+                         "main": (pid, book, ln) in mainlines})
     pairs = []
     for a, b in itertools.combinations(legs, 2):
-        if a["game"] == b["game"] or a["pid"] == b["pid"]:
+        if a["book"] != b["book"] or a["game"] == b["game"] or a["pid"] == b["pid"]:
             continue
         d = a["d"] * b["d"]
         if PAR_LO <= d <= PAR_HI:
             p = a["p"] * b["p"]
-            pairs.append((p * d - 1, p, d, a, b))
+            # a little preference for lines the book also shows as its main line (easiest to find in the app)
+            pairs.append((p * d - 1 + 0.01 * (a["main"] + b["main"]), p, d, a, b))
     pairs.sort(key=lambda x: -x[0])
     chosen, used = [], set()
     for ev, p, d, a, b in pairs:
@@ -146,11 +152,16 @@ def build_parlays(con, date):
         for x in (a, b):
             r = x["r"]
             why, risk = _why(r, x["side"], x["line"], x["p"], x["hit"], x["goalie"], len(x["books"]))
+            cur_s, prev_s = _series(x["pid"])
+            seq = cur_s + prev_s
+            ok = (lambda v: v > x["line"]) if x["side"] == "Over" else (lambda v: v < x["line"])
+            pc = lambda xs: round(sum(1 for v in xs if ok(v)) / len(xs) * 100) if xs else None
+            lh = {"side": x["side"], "line": x["line"], "h5": x["hit"], "h10": pc(seq[:10]), "hs": pc(seq)}
             t = et(r["start"])
             legs_out.append({"pid": x["pid"], "name": r["name"], "team": r["team"], "opp": r["opp"], "game": x["game"],
                              "time": t.strftime("%I:%M %p").lstrip("0"), "side": x["side"], "line": x["line"],
-                             "price": x["price"], "book": x["book"], "books": [{"book": b, "price": pr} for pr, b in x["books"]],
+                             "price": x["price"], "book": x["book"], "main": x["main"], "books": [{"book": b, "price": pr} for pr, b in x["books"]],
                              "p": round(x["p"] * 100), "hit": x["hit"],
-                             "last5": r["last5"], "why": why, "risk": risk, "start": r["start"]})
-        out.append({"n": i, "price": american(d), "p": round(p * 100), "ev": round(ev * 100, 1), "legs": legs_out})
+                             "last5": r["last5"], "why": why, "risk": risk, "start": r["start"], "lh": lh})
+        out.append({"n": i, "price": american(d), "p": round(p * 100), "ev": round((p * d - 1) * 100, 1), "book": a["book"], "legs": legs_out})
     return {"parlays": out, "n_games": n_games, "n_legs": len(legs)}

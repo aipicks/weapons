@@ -84,6 +84,7 @@ h1 span{color:var(--accent)}
 .tmx b{display:block;font:700 17px/1.1 var(--display)}
 .tmx.good{background:var(--good-bg);color:var(--good)}.tmx.warn{background:var(--warn-bg);color:var(--warn)}.tmx.bad{background:var(--bad-bg);color:var(--bad)}
 .pcard{margin-bottom:12px}.pleg{padding:10px 12px;border-top:0.5px solid var(--line,#2a3140)}.pleg.win{background:var(--good-bg)}.pleg.loss{background:var(--bad-bg)}
+.pl-stats{margin:8px 0;border:0.5px solid var(--line,#2a3140);border-radius:6px}.pl-stats summary{cursor:pointer;padding:6px 10px;font-size:13px;color:var(--muted)}.pl-stats .detail{display:block}
 .pl-books{font-size:13px;margin:4px 0}.pl-top small{color:var(--muted)}.pl-pick{margin:6px 0}.pl-why,.pl-risk{margin:4px 0 4px 18px;padding:0;font-size:13px}.pl-why li{margin:2px 0}.pl-risk{color:var(--warn)}
 .pptag{white-space:nowrap;margin-left:8px;font-size:12px;vertical-align:middle}
 .whyl li{font-size:11.5px;padding:1px 6px;border-radius:4px}
@@ -252,6 +253,20 @@ const opSA = (t, tag) => t ? `${tag} <span class="${col(t.c)}">${t.sa}/G (#${t.r
 const pc = v => v==null ? '?' : v+'%';
 const oaS = (t, tag) => t ? `${tag} <span class="${col(t.c_att)}">${t.pg}/G (#${t.r_att})</span> ${'\u00b7'} blocked <span class="${col(t.c_blk)}">${t.blk}% (#${t.r_blk})</span> ${'\u00b7'} on target <span class="${col(t.c_ot)}">${t.ot}% (#${t.r_ot})</span>${t.gp!=null?' ('+t.gp+' GP)':''}` : `${tag} N/A`;
 const attS = a => a ? `${a.pg} att/G (${a.gp} GP) ${'\u00b7'} ${a.sog} SOG ${'\u00b7'} ${a.ot}% on target, ${a.blk}% blocked, ${a.miss}% missed` : 'N/A';
+function sogDetail(r, lh){
+  const sp = '<span class="sep">|</span>';
+  const s = (x, y) => x ? `${x.avg.toFixed(2)}/G (${x.gp} GP)` : 'N/A';
+  const books = r.books.map(b => `${BOOKSHORT(b.b)} ${b.l} (O ${b.o} / U ${b.u})`).join(' · ');
+  return `<div class="detail">
+      <div class="ln"><span class="lab">Shots</span><span class="v">25–26 ${s(r.s25)} ${sp} 26–27 ${s(r.s26)} ${sp} last ${r.nform} <b>${r.form==null?'?':r.form}/G</b> ${sp} last 5: ${r.last5.join(', ')||'?'}<br>Shot attempts last 5: <b>${r.att5.length ? r.att5.join(', ') : '?'}</b>${r.att5.length ? ` (avg ${(r.att5.reduce((a,b)=>a+b,0)/r.att5.length).toFixed(1)})` : ''}</span></div>
+      <div class="ln"><span class="lab">Attempts</span><span class="v">${r.att ? `25–26 ${attS(r.att.p)} ${sp} 26–27 ${attS(r.att.c)}<br>Attempt projection <b>${r.att.rate}/G x ${r.att.ot}% on target = ${r.att.mu}</b> shots` : 'N/A'}</span></div>
+      <div class="ln"><span class="lab">Hit rate</span><span class="v">${lh ? `${lh.side} ${lh.line}: last 5 <b>${lh.h5}/5</b> ${sp} last 10 <b>${pc(lh.h10)}</b> ${sp} season <b>${pc(lh.hs)}</b>` : `Over ${r.line}: last 10 <b>${pc(r.h10)}</b> ${sp} full sample <b>${pc(r.hs)}</b>`} ${sp} model P(over) ${r.po}% / P(under) ${r.pu}% ${sp} market over ${r.fair}%</span></div>
+      <div class="ln"><span class="lab">Usage</span><span class="v">TOI/G 25–26 ${r.toi.p||'?'} ${sp} 26–27 ${r.toi.c||'?'}<br>PP time: 25–26: ${r.ppt.p||'0:00'}/G ${sp} 26–27: ${r.ppt.c||'0:00'}/G<br>${r.opp} PK time: 25–26: ${r.ppt.opk_p||'?'}/G ${sp} 26–27: ${r.ppt.opk_c||'?'}/G${pkRank(r.ppt.opk_r)}</span></div>
+      <div class="ln"><span class="lab">Opp D</span><span class="v">${r.opp} shots against: ${opSA(r.opp_p,'25–26')} ${sp} ${opSA(r.opp_c,'26–27')} ${sp} Preseason projected defence ranking <span class="${col(r.opp_pre.c)}">#${r.opp_pre.rank}${r.opp_pre.tie?' (tied)':''}</span><br>Current defence ranking ${r.def_c ? `<span class="${col(r.def_c.c)}">#${r.def_c.rank}</span> (xGA ${r.def_c.xga}/G ${sp} GA ${r.def_c.ga}/G ${sp} SA ${r.def_c.sa}/G ${sp} ${r.def_c.gp} GP)` : 'N/A'}<br>Shots against to ${r.pos_grp==='D'?'defensemen':'forwards'}: ${opSA(r.pos_p,'25–26')} ${sp} ${opSA(r.pos_c,'26–27')}${r.sm?`<br>Shots matchup score for ${r.pos_grp==='D'?'defensemen':'forwards'}: <b>#${r.sm.rank} of ${r.sm.n}</b> (score ${r.sm.score.toFixed(1)}, 1 = best spot) ${sp} attempts #${r.sm.r_att} ${'·'} shots #${r.sm.r_sog} ${'·'} to ${r.pos_grp==='D'?'D':'F'} #${r.sm.r_pos} ${'·'} blocks #${r.sm.r_blk} ${'·'} on target #${r.sm.r_ot}`:''}
+        <br>Shot attempts against: ${oaS(r.oa_p,'25–26')} ${sp} ${oaS(r.oa_c,'26–27')}${r.f_att!=null?`<br>Attempt-based projection adjusted x${r.f_att} for this opponent (attempt volume and blocks/misses)`:''}</span></div>
+      <div class="ln"><span class="lab">Lines</span><span class="v">${books}</span></div>
+    </div>`;
+}
 function sogRow(r){
   const [ppt, ppc] = PP[r.pp];
   const sp = '<span class="sep">|</span>';
@@ -267,15 +282,7 @@ function sogRow(r){
       ${smBadge(r.sm)}<span class="pct"><b>${r.p.toFixed(1)}%</b><em class="ev ${r.ev>=3?'p':r.ev<=-3?'n':'z'}">EV ${r.ev>0?'+':''}${r.ev.toFixed(1)}%</em><i>${r.game_name.replace(' @ ','@')} ${r.time.replace(' PM','')}</i></span>
       <span class="meter"><div style="width:${Math.min(100, r.p)}%"></div></span>
     </div>
-    <div class="detail">
-      <div class="ln"><span class="lab">Shots</span><span class="v">25–26 ${s(r.s25)} ${sp} 26–27 ${s(r.s26)} ${sp} last ${r.nform} <b>${r.form==null?'?':r.form}/G</b> ${sp} last 5: ${r.last5.join(', ')||'?'}<br>Shot attempts last 5: <b>${r.att5.length ? r.att5.join(', ') : '?'}</b>${r.att5.length ? ` (avg ${(r.att5.reduce((a,b)=>a+b,0)/r.att5.length).toFixed(1)})` : ''}</span></div>
-      <div class="ln"><span class="lab">Attempts</span><span class="v">${r.att ? `25–26 ${attS(r.att.p)} ${sp} 26–27 ${attS(r.att.c)}<br>Attempt projection <b>${r.att.rate}/G x ${r.att.ot}% on target = ${r.att.mu}</b> shots` : 'N/A'}</span></div>
-      <div class="ln"><span class="lab">Hit rate</span><span class="v">Over ${r.line}: last 10 <b>${pc(r.h10)}</b> ${sp} full sample <b>${pc(r.hs)}</b> ${sp} model P(over) ${r.po}% / P(under) ${r.pu}% ${sp} market over ${r.fair}%</span></div>
-      <div class="ln"><span class="lab">Usage</span><span class="v">TOI/G 25–26 ${r.toi.p||'?'} ${sp} 26–27 ${r.toi.c||'?'}<br>PP time: 25–26: ${r.ppt.p||'0:00'}/G ${sp} 26–27: ${r.ppt.c||'0:00'}/G<br>${r.opp} PK time: 25–26: ${r.ppt.opk_p||'?'}/G ${sp} 26–27: ${r.ppt.opk_c||'?'}/G${pkRank(r.ppt.opk_r)}</span></div>
-      <div class="ln"><span class="lab">Opp D</span><span class="v">${r.opp} shots against: ${opSA(r.opp_p,'25–26')} ${sp} ${opSA(r.opp_c,'26–27')} ${sp} Preseason projected defence ranking <span class="${col(r.opp_pre.c)}">#${r.opp_pre.rank}${r.opp_pre.tie?' (tied)':''}</span><br>Current defence ranking ${r.def_c ? `<span class="${col(r.def_c.c)}">#${r.def_c.rank}</span> (xGA ${r.def_c.xga}/G ${sp} GA ${r.def_c.ga}/G ${sp} SA ${r.def_c.sa}/G ${sp} ${r.def_c.gp} GP)` : 'N/A'}<br>Shots against to ${r.pos_grp==='D'?'defensemen':'forwards'}: ${opSA(r.pos_p,'25–26')} ${sp} ${opSA(r.pos_c,'26–27')}${r.sm?`<br>Shots matchup score for ${r.pos_grp==='D'?'defensemen':'forwards'}: <b>#${r.sm.rank} of ${r.sm.n}</b> (score ${r.sm.score.toFixed(1)}, 1 = best spot) ${sp} attempts #${r.sm.r_att} ${'·'} shots #${r.sm.r_sog} ${'·'} to ${r.pos_grp==='D'?'D':'F'} #${r.sm.r_pos} ${'·'} blocks #${r.sm.r_blk} ${'·'} on target #${r.sm.r_ot}`:''}
-        <br>Shot attempts against: ${oaS(r.oa_p,'25–26')} ${sp} ${oaS(r.oa_c,'26–27')}${r.f_att!=null?`<br>Attempt-based projection adjusted x${r.f_att} for this opponent (attempt volume and blocks/misses)`:''}</span></div>
-      <div class="ln"><span class="lab">Lines</span><span class="v">${books}</span></div>
-    </div></article>`;
+    ${sogDetail(r)}</article>`;
 }
 const lab = l => ({BET:'good', LEAN:'warn', PASS:''}[l]);
 const evs = v => (v>0?'+':'')+v.toFixed(1)+'%';
@@ -312,7 +319,8 @@ function parLeg(l){
   const ok = l.outcome==null ? '' : l.outcome===1 ? ' win' : l.outcome===0.5 ? '' : ' loss';
   return `<div class="pleg${ok}"><div class="pl-top"><b>${esc(l.name)}</b> <small>${l.team} vs ${l.opp} · ${l.game} · ${l.time} ET</small></div>
     <div class="pl-pick"><b>${l.side.toUpperCase()} ${l.line} shots</b> <span>${fmtA(l.price)} <small>${BOOKSHORT(l.book)}</small></span> <span class="tag good pptag">${l.p}% our chance</span> <span class="tag pptag">${l.hit}/5 last 5</span></div>
-    <div class="pl-books">Where to find it: ${l.books.map((b,i)=>`<b>${BOOKNAME(b.book)}</b> ${fmtA(b.price)}${i===0?' (best)':''}`).join(' · ')}</div>
+    ${(()=>{const sr = (D.sog||[]).find(x=>x.name===l.name && x.team===l.team); return sr ? `<details class="pl-stats" open><summary>Player stats and matchup</summary>${sogDetail(sr, l.lh)}</details>` : '';})()}
+    <div class="pl-books">Bet at <b>${BOOKNAME(l.book)}</b> ${fmtA(l.price)} · ${l.main?'this is the main shots on goal line (easy to find)':'alternate line: look under alternate shots on goal'}. Other books with it: ${l.books.filter(b=>b.book!==l.book).map(b=>`${BOOKNAME(b.book)} ${fmtA(b.price)}`).join(', ') || 'none in our feed'}.</div>
     <ul class="pl-why">${l.why.map(w=>`<li>${esc(w)}</li>`).join('')}</ul>
     <ul class="pl-risk">${l.risk.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
 }
@@ -324,9 +332,10 @@ function renderParlays(){
   const P = D.parlays || {parlays:[]}, H = D.parlay_hist || {rows:[], w:0, l:0};
   const cards = P.parlays.map(p => `<article class="row pcard"><div class="head" style="grid-template-columns:1fr auto"><span><span class="nm">Parlay ${p.n}</span></span>
       <span class="pct"><b>${fmtA(p.price)}</b><i>${p.p}% both hit · EV ${p.ev>0?'+':''}${p.ev}%</i></span></div>
+      <div class="pl-books" style="padding:6px 12px">Build both legs at <b>${BOOKNAME(p.book)}</b> (price shown is ${BOOKNAME(p.book)}'s combined price).</div>
       <div class="detail" style="display:block">${p.legs.map(parLeg).join('')}</div></article>`).join('');
   const hist = H.rows.length ? `<div class="gtop"><h3>Past parlays (${H.w}-${H.l} settled)</h3>${H.rows.slice(0,24).map(p=>`<div class="gp"><span class="tag ${p.result==='W'?'good':p.result==='L'?'bad':'warn'}">${p.result}</span> ${p.date.slice(5)} ${fmtA(p.price)}: ${p.legs.map(l=>`${esc(l.name)} ${l.side[0]}${l.line}${l.actual==null?'':` (${l.actual})`}`).join(' + ')}</div>`).join('')}</div>` : '';
-  $('#gamesbox').innerHTML = `<div class="gtop"><h3>Today's two-leg shots parlays</h3><div class="gp">${P.parlays.length} parlay${P.parlays.length===1?'':'s'} from ${P.n_games||0} game${P.n_games===1?'':'s'} (6:00 PM ET or later, not started). Each leg is a main or alternate shots line priced about -160 to -350 that the player hit in at least 4 of his last 5 games and that we rate at 60% or better. Two legs from different games make a parlay between about -120 and +112. Prices are the best of FanDuel, DraftKings, BetMGM and Caesars at the last refresh: check them before betting.</div></div>` + (cards || '<div class="gtop"><div class="gp">No parlay passes the filters for the games left today.</div></div>') + hist;
+  $('#gamesbox').innerHTML = `<div class="gtop"><h3>Today's two-leg shots parlays</h3><div class="gp">${P.parlays.length} parlay${P.parlays.length===1?'':'s'} from ${P.n_games||0} game${P.n_games===1?'':'s'} (6:00 PM ET or later, not started). Each leg is a main or alternate shots line priced about -160 to -350 that the player hit in at least 4 of his last 5 games and that we rate at 60% or better. Both legs of a parlay are at the same sportsbook and from different games, and pay between about -120 and +112. Prices are the best of FanDuel, DraftKings, BetMGM and Caesars at the last refresh: check them before betting.</div></div>` + (cards || '<div class="gtop"><div class="gp">No parlay passes the filters for the games left today.</div></div>') + hist;
   $('#count').textContent = P.parlays.length + ' parlays';
   $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
 }
