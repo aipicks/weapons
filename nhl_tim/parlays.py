@@ -2,8 +2,8 @@
 
 Each leg is a main or alternate shots line (2+ shot overs, or unders) from FanDuel, DraftKings, BetMGM or Caesars, priced between
 about -350 and -160, that the player has hit in at least 4 of his last 5 games and that our model puts at 60% or better.
-Two legs from different games at the SAME sportsbook are paired so the parlay pays between about -120 and +112. Between 2 and 5 parlays are
-shown, depending on the size of the slate and on how many pairs pass, best expected value first, no player twice.
+Two legs from different games at the SAME sportsbook are paired so the parlay pays between -125 and +110. Up to 5 parlays are
+shown, depending on the size of the slate and on how many pairs pass, most likely to hit first (not by EV), no player twice. Parlay price -125 to +110.
 
 Only games that start at or after config.MIN_START_HOUR_ET and have not started are used."""
 import datetime as dt
@@ -14,7 +14,7 @@ from .model import logit, sigmoid
 from .sog import _series, build_sog_rows, over_under_push
 
 DEC_LO, DEC_HI = 1.28, 1.62        # leg price window: -350 .. -160
-PAR_LO, PAR_HI = 1.83, 2.13        # parlay price window: -120 .. +113
+PAR_LO, PAR_HI = 1.80, 2.10        # parlay price window: -125 .. +110
 MIN_P, MIN_HIT = 0.60, 4
 
 
@@ -27,7 +27,7 @@ def american(d):
 
 
 def _count(n_games):
-    return 2 if n_games <= 3 else 3 if n_games <= 6 else 4 if n_games <= 9 else 5
+    return 5  # always up to 5 parlays, most likely to hit first
 
 
 def _why(r, side, ln, p, hit, opp_goalie, n_books=2):
@@ -136,7 +136,7 @@ def build_parlays(con, date):
         if PAR_LO <= d <= PAR_HI:
             p = a["p"] * b["p"]
             # a little preference for lines the book also shows as its main line (easiest to find in the app)
-            pairs.append((p * d - 1 + 0.01 * (a["main"] + b["main"]), p, d, a, b))
+            pairs.append((p, p, d, a, b))  # ranked by the chance that both legs hit, not by EV
     pairs.sort(key=lambda x: -x[0])
     chosen, used = [], set()
     for ev, p, d, a, b in pairs:
