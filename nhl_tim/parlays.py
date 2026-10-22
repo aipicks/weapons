@@ -38,7 +38,7 @@ def _why(r, side, ln, p, hit, opp_goalie, n_books=2):
     word = f"{'over' if over else 'under'} {ln:g}"
     why.append(f"Hit {word} in {hit} of his last 5 games ({', '.join(str(x) for x in l5)} shots).")
     mu = r["mu"]
-    why.append(f"Our projection is {mu:.1f} shots, {'above' if (mu > ln) == over else 'below'} the {ln:g} line"
+    why.append(f"Our projection is {mu:.1f} shots, {'above' if mu > ln else 'below'} the {ln:g} line"
                f" (the market implies {r['mu_market']:.1f}).")
     a = r.get("att")
     if a:
