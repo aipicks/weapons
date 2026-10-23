@@ -54,6 +54,78 @@ def _gg(pid):
     return _GG[pid]
 
 
+_POSNAME = {"C": "Center", "L": "Left wing", "R": "Right wing", "D": "Defense"}
+_POSMAP = {}
+
+
+def _posx(pid, fallback):
+    """Exact position (Center, Left wing, Right wing, Defense) from the NHL skater data; falls back to Forward/Defense."""
+    if not _POSMAP:
+        for season in (PREV_SEASON, CUR_SEASON):  # current season last so it wins
+            for r in nhl_api.skaters(season, False):
+                if r.get("positionCode") in _POSNAME:
+                    _POSMAP[r["playerId"]] = _POSNAME[r["positionCode"]]
+    return _POSMAP.get(pid) or ("Defense" if fallback == "D" else "Forward")
+
+
+def _rankings_payload(con):
+    """Every team's defensive numbers for THIS season only, for the Rankings tab."""
+    from ..posshots import current_defense
+    cd = current_defense(con)
+    teams = {}
+    for r in con.execute("SELECT team, pk_toi_pg FROM team_pk_toi WHERE season=?", (CUR_SEASON,)):
+        teams.setdefault(r["team"], {})["pk"] = r["pk_toi_pg"]
+    for r in con.execute("SELECT team, gp, sa_pg FROM team_season WHERE season=?", (CUR_SEASON,)):
+        t = teams.setdefault(r["team"], {})
+        t["gp"], t["sa"] = r["gp"], r["sa_pg"]
+    for r in con.execute("SELECT team, sa_f_pg FROM team_pos_sa WHERE season=?", (CUR_SEASON,)):
+        teams.setdefault(r["team"], {})["saf"] = r["sa_f_pg"]
+    for r in con.execute("SELECT team, gp, att_a, blk_a, sog_a FROM team_att WHERE season=? AND gp>0", (CUR_SEASON,)):
+        t = teams.setdefault(r["team"], {})
+        t["att"] = r["att_a"] / r["gp"]
+        t["blk"] = r["blk_a"] / r["att_a"] * 100
+        t["ot"] = r["sog_a"] / r["att_a"] * 100
+    for t, d in cd.items():
+        teams.setdefault(t, {})["def"] = d["rank"]
+    return [dict(team=t, **{k: (round(v, 1) if isinstance(v, float) else v) for k, v in d.items()})
+            for t, d in sorted(teams.items()) if d.get("gp")]
+
+
+def _lineups_payload(con):
+    """Lines and pairs per team from Daily Faceoff plus the two goalies ranked G1/G2 by projected starts."""
+    gp26 = {r["team"]: r["gp"] for r in con.execute("SELECT team, gp FROM team_season WHERE season=?", (CUR_SEASON,))}
+    out = {}
+    pl = {r["nhl_id"]: r for r in con.execute("SELECT nhl_id, name FROM player")}
+    for r in con.execute("SELECT * FROM team_lineup ORDER BY team, grp, slot"):
+        t = out.setdefault(r["team"], {"F": {}, "D": {}, "G": []})
+        pid = r["nhl_id"]
+        unit = con.execute("SELECT unit FROM pp_unit WHERE nhl_id=?", (pid,)).fetchone() if pid else None
+        toi = con.execute("SELECT toi_pg FROM player_toi WHERE nhl_id=? AND season=?", (pid, CUR_SEASON)).fetchone() if pid else None
+        p = {"name": r["name"], "slot": r["slot"], "pp": unit["unit"] if unit else 0,
+             "toi": _mmss(toi["toi_pg"]) if toi else None, "pos": _posx(pid, "D" if r["grp"].startswith("D") else "F") if pid else None}
+        key = "F" if r["grp"].startswith("F") else "D"
+        t[key].setdefault(r["grp"], []).append(p)
+    for team, t in out.items():
+        gl = []
+        for g in con.execute("SELECT * FROM team_goalies WHERE team=? ORDER BY depth", (team,)):
+            s25 = con.execute("SELECT * FROM goalie_season WHERE nhl_id=? AND season=?", (g["nhl_id"], PREV_SEASON)).fetchone() if g["nhl_id"] else None
+            s26 = con.execute("SELECT * FROM goalie_season WHERE nhl_id=? AND season=?", (g["nhl_id"], CUR_SEASON)).fetchone() if g["nhl_id"] else None
+            sh25 = (s25["starts"] or 0) / 82 if s25 else 0.0
+            sh26 = (s26["starts"] or 0) / gp26[team] if (s26 and gp26.get(team)) else 0.0
+            share = 0.6 * sh26 + 0.4 * sh25  # this season counts more than last
+            gl.append({"name": g["name"], "share": share,
+                       "s25": {"gp": s25["gp"], "starts": s25["starts"], "sv": round(s25["sv_pct"], 3), "gaa": round(s25["gaa"], 2)} if s25 else None,
+                       "s26": {"gp": s26["gp"], "starts": s26["starts"], "sv": round(s26["sv_pct"], 3), "gaa": round(s26["gaa"], 2)} if s26 else None})
+        gl = sorted(gl, key=lambda g: -g["share"])[:2]
+        tot = sum(g["share"] for g in gl) or 1.0
+        for i, g in enumerate(gl):
+            g["rank"] = i + 1
+            g["proj"] = round(g["share"] / tot * 100)
+            del g["share"]
+        t["G"] = gl
+    return out
+
+
 def _late_eids(con, date):
     """Event ids of the games that start at or after MIN_START_HOUR_ET (Eastern)."""
     from ..config import MIN_START_HOUR_ET
@@ -167,7 +239,7 @@ def _rows(con, rows):
         out.append({
             "pool": r["pool"], "rank": rk, "n": n, "tier": tier, "start": r["start"],
             "game_name": f"{r['away']} @ {r['home']}", "time": tm, "eid": r["event_id"],
-            "name": r["name"], "team": r["team"], "opp": r["opp"], "pos": r["pos"], "chg": r["team_changed"],
+            "name": r["name"], "team": r["team"], "opp": r["opp"], "pos": r["pos"], "posx": _posx(r["nhl_id"], r["pos"]), "chg": r["team_changed"],
             "p": round(r["p"] * 100, 1), "pm": round(r["p_mkt"] * 100, 1) if r["p_mkt"] else None,
             "pp": r["pp_unit"], "ev": ev, "edge": edge, "line": line, "sk": sk,
             "tm": {"score": round(_TM[r["team"]]["score"], 1)} if r["team"] in _TM else None,
@@ -236,7 +308,7 @@ def _sog_payload(con, date, eids=None):
         out.append({
             "rank": r["rank"], "n": r["n"], "tier": tier, "eid": r["event_id"], "start": r["start"],
             "game_name": f"{r['away']} @ {r['home']}", "time": tm, "name": r["name"], "team": r["team"],
-            "opp": r["opp"], "pos": r["pos"], "pp": r["pp_unit"], "side": r["side"], "line": r["line"],
+            "opp": r["opp"], "pos": r["pos"], "posx": _posx(r["nhl_id"], r["pos"]), "pp": r["pp_unit"], "side": r["side"], "line": r["line"],
             "tline": (lambda lr: lr["grp"] if lr else None)(con.execute("SELECT grp FROM player_line WHERE nhl_id=?", (r["nhl_id"],)).fetchone()),
             "price": fmt_american(r["price"]), "book": r["book"], "p": round(r["p"] * 100, 1), "ev": round(r["ev"] * 100, 1),
             "mu": round(r["mu"], 2), "mm": round(r["mu_market"], 2), "po": round(r["p_over"] * 100, 1), "pu": round(r["p_under"] * 100, 1),
@@ -405,7 +477,7 @@ def build_site(date):
                             "off": round(m["off"], 2) if m["off"] is not None else None, "p_off": round(m["p_off"] * 100),
                             "def": round(m["def_score"], 1), "p_def": round(m["p_def"] * 100),
                             "score": round(m["score"], 1)} for m in matchups],
-               "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, late), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
+               "rankings": _rankings_payload(con), "lineups": _lineups_payload(con), "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, late), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")

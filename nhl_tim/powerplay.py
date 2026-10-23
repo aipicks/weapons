@@ -88,8 +88,13 @@ def update_lines(con=None):
     n, unmatched = 0, []
     from .daily import _find_goalie
     con.execute("DELETE FROM team_goalies")
+    con.execute("DELETE FROM team_lineup")
     for r in rows:
         team = norm_team(r["team"])
+        if r["group"] != "g":  # full lineup with slots (lw/c/rw, ld/rd) for the Lineups tab
+            _p = _match(con, team, r["name"], "D" if r["group"].startswith("d") else "F") or \
+                _prefer_forward(con, team, r["name"], "D" if r["group"].startswith("d") else "F")
+            con.execute("INSERT OR REPLACE INTO team_lineup VALUES(?,?,?,?,?)", (team, r["group"].upper(), r["pos"], r["name"], _p))
         if r["group"] == "g":  # goalie depth chart: g1 = number one, g2 = backup, g3 = third
             try:
                 depth = int(r["pos"].lstrip("g"))

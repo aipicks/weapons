@@ -86,6 +86,16 @@ h1 span{color:var(--accent)}
 .pcard{margin-bottom:12px}.pleg{padding:10px 12px;border-top:0.5px solid var(--line,#2a3140)}.pleg.win{background:var(--good-bg)}.pleg.loss{background:var(--bad-bg)}
 .pl-stats{margin:8px 0;border:0.5px solid var(--line,#2a3140);border-radius:6px}.pl-stats summary{cursor:pointer;padding:6px 10px;font-size:13px;color:var(--muted)}.pl-stats .detail{display:block}
 .pl-books{font-size:13px;margin:4px 0}.pl-top small{color:var(--muted)}.pl-pick{margin:6px 0}.pl-why,.pl-risk{margin:4px 0 4px 18px;padding:0;font-size:13px}.pl-why li{margin:2px 0}.pl-risk{color:var(--warn)}
+.rk{width:100%;border-collapse:collapse;font-size:14px}.rk th,.rk td{padding:7px 6px;text-align:right;border-bottom:0.5px solid var(--line,#2a3140)}.rk th:first-child,.rk td:first-child{text-align:left}
+.rk th button{all:unset;cursor:pointer;font-size:12px;color:var(--muted)}.rk th.on button{color:var(--text,#e8ecf3);font-weight:600}
+.rk-c{display:inline-block;padding:2px 7px;border-radius:5px}.rk-c.g{background:var(--good-bg);color:var(--good)}.rk-c.r{background:var(--bad-bg);color:var(--bad)}.rk-c.n{background:var(--mid-bg);color:var(--mid)}
+#lu-pick{font-size:18px;padding:10px 12px;margin:6px 0;min-width:140px}
+.lu-sec{font:700 14px var(--display);margin:16px 0 6px;letter-spacing:.04em}
+.lu-row3,.lu-row2{display:grid;gap:8px;margin:0 0 8px}.lu-row3{grid-template-columns:repeat(3,1fr)}.lu-row2{grid-template-columns:repeat(2,1fr)}
+.lu-lab{grid-column:1/-1;font-size:12px;color:var(--muted)}
+.lu-sq{border:1px solid var(--line,#2a3140);border-radius:10px;padding:12px 10px;min-height:92px;display:flex;flex-direction:column;gap:4px;background:var(--card,#141a24)}
+.lu-sq b{font-size:16px;line-height:1.2}.lu-pos{font:600 12px var(--mono);color:var(--muted)}.lu-meta{font-size:12px}.lu-sq small{font-size:12px;color:var(--muted)}
+.lu-sq.goalie{min-height:140px}
 .pptag{white-space:nowrap;margin-left:8px;font-size:12px;vertical-align:middle}
 .whyl li{font-size:11.5px;padding:1px 6px;border-radius:4px}
 .whyl li.z{background:var(--warn-bg);color:var(--warn)} .whyl li.p{background:var(--good-bg);color:var(--good)} .whyl li.n{background:var(--bad-bg);color:var(--bad)}
@@ -183,7 +193,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pools = [...new Set(D.rows.map(r => r.pool))].sort();
 let view = 'tim', pool = pools[0], grouped = false, limit = 40, sortev = false, evonly = false;
-try { const s = JSON.parse(localStorage.getItem('pb')||'{}'); if (pools.includes(s.pool)) pool = s.pool; grouped = !!s.grouped; if (['all','tim','sog','parlays','games','results'].includes(s.view)) view = s.view; } catch(e){}
+try { const s = JSON.parse(localStorage.getItem('pb')||'{}'); if (pools.includes(s.pool)) pool = s.pool; grouped = !!s.grouped; if (['all','tim','sog','parlays','rankings','lineups','games','results'].includes(s.view)) view = s.view; } catch(e){}
 const save = () => { try { localStorage.setItem('pb', JSON.stringify({pool, grouped, view})); } catch(e){} };
 
 let sortKey = 'default', sortAsc = false;
@@ -191,7 +201,7 @@ const LINE_LABEL = {F1:'Line 1',F2:'Line 2',F3:'Line 3',F4:'Line 4',D1:'Pair 1',
 const lineTag = c => `<span class="tag pptag">${c ? LINE_LABEL[c] : 'No line'}</span>`;  // neutral gray: line is context, not a rating
 const sp0 = '<span class="sep">|</span>';
 const label = p => p ? 'Pick #'+p : 'All priced';
-const VIEWS = {tim:'Tim Hortons NHL Challenge', all:'+EV GOAL SCORERS', sog:'Shots on Goal', parlays:'Shots Parlays', games:'Game Bets', results:'Results'};
+const VIEWS = {tim:'Tim Hortons NHL Challenge', all:'+EV GOAL SCORERS', sog:'Shots on Goal', parlays:'Shots Parlays', rankings:'Rankings', lineups:'Lineups', games:'Game Bets', results:'Results'};
 const col = c => c ? `c-${c}` : 'c-gray';
 const rk = (v, c) => v ? `<span class="${col(c)}">#${v}</span>` : '<span class="c-na">unranked</span>';
 const PP = {1:['PP1 ✅','good'], 2:['PP2 ✔','warn'], 0:['NO PP UNIT','bad']};
@@ -232,7 +242,7 @@ function row(r){
   return `<article class="row t-${r.tier}">
     <div class="head${r.tm?' has-tm':''}">
       <span class="rk">${r.rank}</span>
-      <span><span class="nm">${esc(r.name)}${r.chg?'*':''}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span>${lineTag(r.line)}</span>
+      <span><span class="nm">${esc(r.name)}${r.chg?'*':''}<small>${r.team} · ${r.posx||r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span>${lineTag(r.line)}</span>
         <ul class="whyl">${why}</ul></span>
       ${tmBadge(r.tm)}<span class="pct"><b>${r.p.toFixed(1)}%</b>${(view!=='all'||r.ev==null)?'':`<em class="ev ${r.ev>=3?'p':r.ev<=-3?'n':'z'}">EV ${r.ev>0?'+':''}${r.ev.toFixed(1)}%</em>`}<i>${r.game_name.replace(' @ ','@')} ${r.time.replace(' PM','')}</i></span>
       <span class="meter"><div style="width:${Math.min(100, r.p*2)}%"></div></span>
@@ -276,7 +286,7 @@ function sogRow(r){
   return `<article class="row t-${r.tier}">
     <div class="head${r.sm?' has-tm':''}">
       <span class="rk">${r.rank}</span>
-      <span><span class="nm">${esc(r.name)}<small>${r.team} · ${r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span>${lineTag(r.tline)}</span>
+      <span><span class="nm">${esc(r.name)}<small>${r.team} · ${r.posx||r.pos}</small><span class="tag ${ppc} pptag">${ppt}</span>${lineTag(r.tline)}</span>
         <span class="sidepick"><b class="${r.side==='Over'?'ov':'un'}">${r.side.toUpperCase()} ${r.line}</b> <span>${r.price} <small>${BOOKSHORT(r.book)}</small></span> <span class="sep">|</span> projected ${r.mu.toFixed(1)} shots (market implies ${r.mm.toFixed(1)})</span>
         <ul class="whyl">${why}</ul></span>
       ${smBadge(r.sm)}<span class="pct"><b>${r.p.toFixed(1)}%</b><em class="ev ${r.ev>=3?'p':r.ev<=-3?'n':'z'}">EV ${r.ev>0?'+':''}${r.ev.toFixed(1)}%</em><i>${r.game_name.replace(' @ ','@')} ${r.time.replace(' PM','')}</i></span>
@@ -317,7 +327,7 @@ function gcard(g){
 }
 function parLeg(l){
   const ok = l.outcome==null ? '' : l.outcome===1 ? ' win' : l.outcome===0.5 ? '' : ' loss';
-  return `<div class="pleg${ok}"><div class="pl-top"><b>${esc(l.name)}</b> <small>${l.team} vs ${l.opp} · ${l.game} · ${l.time} ET</small></div>
+  return `<div class="pleg${ok}"><div class="pl-top"><b>${esc(l.name)}</b> ${(()=>{const sr=(D.sog||[]).find(x=>x.name===l.name&&x.team===l.team); if(!sr) return ''; const [pt,pc]=PP[sr.pp]; return `<span class="tag pptag">${sr.posx||sr.pos}</span><span class="tag ${pc} pptag">${pt}</span>${lineTag(sr.tline)}`;})()} <small>${l.team} vs ${l.opp} · ${l.game} · ${l.time} ET</small></div>
     <div class="pl-pick"><b>${l.side.toUpperCase()} ${l.line} shots</b> <span>${fmtA(l.price)} <small>${BOOKSHORT(l.book)}</small></span> <span class="tag good pptag">${l.p}% our chance</span> <span class="tag pptag">${l.hit}/5 last 5</span></div>
     ${(()=>{const sr = (D.sog||[]).find(x=>x.name===l.name && x.team===l.team); return sr ? `<details class="pl-stats" open><summary>Player stats and matchup</summary>${sogDetail(sr, l.lh)}</details>` : '';})()}
     <div class="pl-books">Bet at <b>${BOOKNAME(l.book)}</b> ${fmtA(l.price)} · ${l.main?'this is the main shots on goal line (easy to find)':'alternate line: look under alternate shots on goal'}. Other books with it: ${l.books.filter(b=>b.book!==l.book).map(b=>`${BOOKNAME(b.book)} ${fmtA(b.price)}`).join(', ') || 'none in our feed'}.</div>
@@ -339,6 +349,53 @@ function renderParlays(){
   $('#count').textContent = P.parlays.length + ' parlays';
   $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
 }
+const mmss = sec => sec==null ? 'n/a' : Math.floor(sec/60)+':'+String(Math.round(sec%60)).padStart(2,'0');
+const RK_COLS = [
+  ['team','Team',null],['pk','PK time (shorthanded)','pk'],['sa','Shots against','sa'],['saf','Shots to forwards','saf'],
+  ['att','Attempts against','att'],['blk','Blocked %','blk'],['ot','Attempts on target %','ot'],['def','Current defence rank','def']];
+let rkKey = 'saf', rkAsc = false;
+function renderRankings(){
+  $('#list').hidden = true; $('#gamesbox').hidden = false;
+  $('#tabs').hidden = true; $('#filters').hidden = true; $('#by').hidden = true;
+  const R = (D.rankings||[]).map(x=>({...x}));
+  const rankOf = (k, asc) => { const s = R.filter(x=>x[k]!=null).sort((a,b)=>asc?a[k]-b[k]:b[k]-a[k]); s.forEach((x,i)=>x['r_'+k]=i+1); };
+  ['pk','sa','saf','att','blk','ot'].forEach(k=>rankOf(k,false));  // #1 = highest value
+  rankOf('def', true);                                            // #1 = best defence
+  const good = (k, r) => { const n = R.length; if (k==='def') return r>n*2/3?'g':r<=n/3?'r':'n';
+    if (k==='blk') return r>n*2/3?'g':r<=n/3?'r':'n';             // few blocks help shooters
+    return r<=n/3?'g':r>n*2/3?'r':'n'; };                         // more shots/attempts/PK time/on-target help shooters
+  const fmt = (k,v) => k==='pk'?mmss(v):k==='blk'||k==='ot'?v+'%':v;
+  const rows = R.slice().sort((a,b)=>{ const x=a[rkKey], y=b[rkKey]; const c = typeof x==='string'?x.localeCompare(y):(x-y); return rkAsc?c:-c; });
+  const head = RK_COLS.map(([k,l])=>`<th class="${k===rkKey?'on':''}"><button data-rk="${k}">${l}${k===rkKey?(rkAsc?' ▲':' ▼'):''}</button></th>`).join('');
+  const body = rows.map(r=>`<tr><td><b>${r.team}</b> <small>${r.gp} GP</small></td>${RK_COLS.slice(1).map(([k])=>r[k]==null?'<td>n/a</td>':`<td><span class="rk-c ${good(k,r['r_'+k])}">${fmt(k,r[k])} <small>#${r['r_'+k]}</small></span></td>`).join('')}</tr>`).join('');
+  $('#gamesbox').innerHTML = `<div class="gtop"><h3>Team rankings, this season only</h3><div class="gp">Tap a column title to sort (tap again to flip). <span class="rk-c g">Green</span> = best matchup for shooters, <span class="rk-c r">red</span> = toughest. #1 is the highest number for every column except current defence rank, where #1 is the best defence. Shots to forwards and the other defensive numbers come from this season's games only.</div></div><div style="overflow-x:auto"><table class="rk"><tr>${head}</tr>${body}</table></div>`;
+  $('#count').textContent = R.length + ' teams';
+  $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
+}
+let luTeam = '';
+function luCell(p, lab){
+  if (!p) return `<div class="lu-sq empty"><span class="lu-pos">${lab}</span><b>-</b></div>`;
+  const [pt,pc] = PP[p.pp||0];
+  return `<div class="lu-sq"><span class="lu-pos">${lab}</span><b>${esc(p.name)}</b><span class="lu-meta"><span class="tag ${pc} pptag">${pt}</span>${p.toi?` <small>${p.toi} TOI/G</small>`:''}</span></div>`;
+}
+function renderLineups(){
+  $('#list').hidden = true; $('#gamesbox').hidden = false;
+  $('#tabs').hidden = true; $('#filters').hidden = true; $('#by').hidden = true;
+  const L = D.lineups || {}; const teams = Object.keys(L).sort();
+  if (!luTeam || !L[luTeam]) luTeam = teams.includes('TOR') ? 'TOR' : teams[0];
+  const t = L[luTeam] || {F:{},D:{},G:[]};
+  const slot = (grp, s) => (t.F[grp]||t.D[grp]||[]).find(p=>p.slot===s);
+  const fw = ['F1','F2','F3','F4'].map((g,i)=>`<div class="lu-row3"><div class="lu-lab">Line ${i+1}</div>${luCell(slot(g,'lw'),'LW')}${luCell(slot(g,'c'),'C')}${luCell(slot(g,'rw'),'RW')}</div>`).join('');
+  const dm = ['D1','D2','D3'].map((g,i)=>`<div class="lu-row2"><div class="lu-lab">Pair ${i+1}</div>${luCell(slot(g,'ld'),'LD')}${luCell(slot(g,'rd'),'RD')}</div>`).join('');
+  const gl = (t.G||[]).map(g=>{ const st=(s,tag)=>s?`${tag}: ${s.starts} starts of ${s.gp} GP · ${s.sv} SV% · ${s.gaa} GAA`:`${tag}: no games`;
+    return `<div class="lu-sq goalie"><span class="lu-pos">Goalie ${g.rank}${g.rank===1?' · projected starter':' · backup'}</span><b>${esc(g.name)}</b><span class="lu-meta">projected to start about ${g.proj}% of games</span><small>${st(g.s26,'26-27')}<br>${st(g.s25,'25-26')}</small></div>`; }).join('');
+  $('#gamesbox').innerHTML = `<div class="gtop"><h3>Lineups</h3><select id="lu-pick" aria-label="Team">${teams.map(x=>`<option value="${x}"${x===luTeam?' selected':''}>${x}</option>`).join('')}</select><div class="gp">Lines and pairs from Daily Faceoff, power-play unit and ice time from this season. Goalie 1 is the one projected to play more games (this season counts 60%, last season 40%).</div></div>
+  <div class="lu-sec">Forwards</div>${fw}<div class="lu-sec">Defense</div>${dm}<div class="lu-sec">Goalies</div><div class="lu-row2">${gl}</div>`;
+  $('#count').textContent = luTeam + ' lineup';
+  $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
+}
+document.addEventListener('change', e => { if (e.target && e.target.id === 'lu-pick') { luTeam = e.target.value; renderLineups(); } });
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button[data-rk]'); if (!b) return; const k = b.dataset.rk; if (k===rkKey) rkAsc=!rkAsc; else { rkKey=k; rkAsc=(k==='team'); } renderRankings(); });
 function renderGames(){
   $('#list').hidden = true; $('#gamesbox').hidden = false;
   $('#tabs').hidden = true; $('#filters').hidden = true; $('#by').hidden = true;
@@ -423,6 +480,8 @@ function matchupTable(){
 function render(){
   if (view === 'games') return renderGames();
   if (view === 'parlays') return renderParlays();
+  if (view === 'rankings') return renderRankings();
+  if (view === 'lineups') return renderLineups();
   if (view === 'results') return renderResults();
   $('#gamesbox').hidden = true; $('#list').hidden = false;
   const all = view !== 'tim';
