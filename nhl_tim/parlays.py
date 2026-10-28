@@ -15,7 +15,8 @@ from .sog import _series, build_sog_rows, over_under_push
 
 DEC_LO, DEC_HI = 1.28, 1.62        # leg price window: -350 .. -160
 PAR_LO, PAR_HI = 1.80, 2.10        # parlay price window: -125 .. +110
-MIN_P, MIN_HIT = 0.60, 4
+MIN_P, MIN_HIT = 0.55, 3
+SHRINK = 0.93  # settled parlay legs hit 65% when we said 70%: scale every leg chance down by the same ratio
 
 
 def _dec(american):
@@ -114,7 +115,7 @@ def build_parlays(con, date):
         mod_over, mkt_over = mo[0] / (mo[0] + mo[1]), mk[0] / (mk[0] + mk[1])
         p_over = sigmoid(0.5 * logit(mkt_over) + 0.5 * logit(mod_over))
         push = mo[2]
-        p = (p_over if side == "Over" else 1 - p_over) * (1 - push)
+        p = (p_over if side == "Over" else 1 - p_over) * (1 - push) * SHRINK
         hit = sum(1 for s in r["last5"] if (s > ln if side == "Over" else s < ln))
         if p < MIN_P or hit < MIN_HIT:
             continue
@@ -136,7 +137,7 @@ def build_parlays(con, date):
         if PAR_LO <= d <= PAR_HI:
             p = a["p"] * b["p"]
             # a little preference for lines the book also shows as its main line (easiest to find in the app)
-            pairs.append((p, p, d, a, b))  # ranked by the chance that both legs hit, not by EV
+            pairs.append((p * d - 1, p, d, a, b))  # ranked by parlay EV (chance both hit x payout), not by chance alone
     pairs.sort(key=lambda x: -x[0])
     chosen, used = [], set()
     for ev, p, d, a, b in pairs:
