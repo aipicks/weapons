@@ -76,7 +76,7 @@ def _why(r, side, ln, p, hit, opp_goalie, n_books=2):
     return why, risk
 
 
-def build_parlays(con, date):
+def build_parlays(con, date, exclude=()):
     now = dt.datetime.now(dt.timezone.utc)
     et = lambda s: dt.datetime.fromisoformat(s.replace("Z", "+00:00")) - dt.timedelta(hours=4)
     rows = {}
@@ -85,6 +85,8 @@ def build_parlays(con, date):
         if st <= now or et(r["start"]).hour < MIN_START_HOUR_ET:
             continue
         if (r["gp_cur"] or 0) + (r["gp_prev"] or 0) < 3:
+            continue
+        if r["name"] in exclude:
             continue
         rows[r["nhl_id"]] = r
     if not rows:

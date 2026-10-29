@@ -1,4 +1,6 @@
 """Daily refresh: current-season skater/goalie stats, games+odds (SGO), projected goalies (RotoWire)."""
+import re
+
 from .posshots import update_pos_shots
 from .powerplay import update_power_play_units
 from .config import ALLOWED_BOOKS, CUR_SEASON, PLAYER_PROP_EXCLUDE
@@ -62,6 +64,9 @@ def ingest_slate(con, date, force=True):
     stats = {"games": len(events), "atg": 0, "atg_unmatched": []}
     for e in events:
         eid = e["eventID"]
+        for pid_key, pl in e.get("players", {}).items():  # the feed sometimes omits names: rebuild from the id (ADAM_LOWRY_1_NHL)
+            if not pl.get("name"):
+                pl["name"] = " ".join(w.capitalize() for w in re.sub(r"_\d+_NHL$", "", pid_key).split("_"))
         h = norm_team(e["teams"]["home"]["names"]["short"])
         a = norm_team(e["teams"]["away"]["names"]["short"])
         con.execute("INSERT OR REPLACE INTO game VALUES(?,?,?,?,?)", (date, eid, e["status"]["startsAt"], a, h))
@@ -293,7 +298,25 @@ def update_lines(con):
         print("line update failed:", e)
 
 
+def _backup_db():
+    """Copy the database aside before every run (kept: the last 3 good copies), because a half-written file lost data once."""
+    import os, shutil, sqlite3 as _sq
+    from .config import DB_PATH
+    try:
+        c = _sq.connect(DB_PATH)
+        ok = c.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+        c.close()
+        if ok:
+            for i in (2, 1):
+                if os.path.exists(f"{DB_PATH}.bak{i}"):
+                    shutil.copy(f"{DB_PATH}.bak{i}", f"{DB_PATH}.bak{i + 1}")
+            shutil.copy(DB_PATH, f"{DB_PATH}.bak1")
+    except Exception as e:
+        print("db backup skipped:", e)
+
+
 def update_daily(date, goalie_source="dailyfaceoff"):
+    _backup_db()
     con = connect()
     update_current_stats(con)
     update_xg(con)
