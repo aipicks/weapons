@@ -28,7 +28,7 @@ def american(d):
 
 
 def _count(n_games):
-    return 5  # always up to 5 parlays, most likely to hit first
+    return 8  # up to 8 parlays, best EV first
 
 
 def _why(r, side, ln, p, hit, opp_goalie, n_books=2):
