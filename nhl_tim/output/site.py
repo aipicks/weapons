@@ -136,6 +136,14 @@ def _late_eids(con, date):
     return out
 
 
+def _open_eids(con, date):
+    """Event ids of every game that has not started yet, early afternoon games included (the Tim Hortons pools use these)."""
+    import datetime as dt
+    now = dt.datetime.now(dt.timezone.utc)
+    return {g["event_id"] for g in con.execute("SELECT event_id, start_utc FROM game WHERE date=?", (date,))
+            if dt.datetime.fromisoformat(g["start_utc"].replace("Z", "+00:00")) > now}
+
+
 def _renumber(rows, by_pool):
     """Re-rank rows 1..N (within each pool when by_pool) after hidden games were removed, keeping their order."""
     groups = {}
@@ -458,15 +466,16 @@ def _goalie_panel(con, date, eids=None):
 def build_site(date):
     con = connect()
     late = _late_eids(con, date)
+    pool_eids = late | _open_eids(con, date)  # pools show every game not yet started, even before 6 PM ET
     rows, missing = build_rows(con, date)
-    rows = [r for r in rows if r["event_id"] in late]
+    rows = [r for r in rows if r["event_id"] in pool_eids]
     _renumber(rows, True)
     all_rows, _ = build_rows(con, date, all_players=True)
     all_rows = [r for r in all_rows if r["event_id"] in late]
     all_rows = sorted([r for r in all_rows if r["ev"] is not None and r["p"] >= MIN_P_ALL], key=lambda r: r["rank"])[:TOP_N_ALL]
     for i_, r_ in enumerate(all_rows):  # renumber 1..N now that the list is filtered
         r_["rank"], r_["pool_n"] = i_ + 1, len(all_rows)
-    matchups = team_matchups(con, date, late)
+    matchups = team_matchups(con, date, pool_eids)
     _TM.clear()
     _TM.update({m["team"]: m for m in matchups})
     meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
@@ -477,7 +486,7 @@ def build_site(date):
                             "off": round(m["off"], 2) if m["off"] is not None else None, "p_off": round(m["p_off"] * 100),
                             "def": round(m["def_score"], 1), "p_def": round(m["p_def"] * 100),
                             "score": round(m["score"], 1)} for m in matchups],
-               "rankings": _rankings_payload(con), "lineups": _lineups_payload(con), "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, late), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
+               "rankings": _rankings_payload(con), "lineups": _lineups_payload(con), "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, pool_eids), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")
