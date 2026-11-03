@@ -85,6 +85,15 @@ def _rankings_payload(con):
         t["att"] = r["att_a"] / r["gp"]
         t["blk"] = r["blk_a"] / r["att_a"] * 100
         t["ot"] = r["sog_a"] / r["att_a"] * 100
+    for r in con.execute("SELECT team, sit, gp, gf, ga, sf, sa, xgf, xga FROM team_mp WHERE season=? AND gp>0", (CUR_SEASON,)):
+        t = teams.setdefault(r["team"], {})
+        if r["sit"] == "all":
+            t.update(gf=r["gf"] / r["gp"], ga=r["ga"] / r["gp"], sf=r["sf"] / r["gp"], xgf=r["xgf"] / r["gp"], xga=r["xga"] / r["gp"],
+                     diff=(r["gf"] - r["ga"]) / r["gp"])
+        elif r["sit"] == "5on4":
+            t["ppg"] = r["gf"] / r["gp"]
+        elif r["sit"] == "4on5":
+            t["pkga"] = r["ga"] / r["gp"]
     for t, d in cd.items():
         teams.setdefault(t, {})["def"] = d["rank"]
     return [dict(team=t, **{k: (round(v, 1) if isinstance(v, float) else v) for k, v in d.items()})

@@ -352,23 +352,24 @@ function renderParlays(){
 const mmss = sec => sec==null ? 'n/a' : Math.floor(sec/60)+':'+String(Math.round(sec%60)).padStart(2,'0');
 const RK_COLS = [
   ['team','Team',null],['pk','PK time (shorthanded)','pk'],['sa','Shots against','sa'],['saf','Shots to forwards','saf'],
-  ['att','Attempts against','att'],['blk','Blocked %','blk'],['ot','Attempts on target %','ot'],['def','Current defence rank','def']];
+  ['att','Attempts against','att'],['blk','Blocked %','blk'],['ot','Attempts on target %','ot'],['def','Current defence rank','def'],
+  ['gf','Goals for / game'],['ga','Goals against / game'],['diff','Goal diff / game'],['sf','Shots for / game'],['xgf','xG for / game'],['xga','xG against / game'],['ppg','PP goals / game'],['pkga','PK goals against / game']];
 let rkKey = 'saf', rkAsc = false;
 function renderRankings(){
   $('#list').hidden = true; $('#gamesbox').hidden = false;
   $('#tabs').hidden = true; $('#filters').hidden = true; $('#by').hidden = true;
   const R = (D.rankings||[]).map(x=>({...x}));
   const rankOf = (k, asc) => { const s = R.filter(x=>x[k]!=null).sort((a,b)=>asc?a[k]-b[k]:b[k]-a[k]); s.forEach((x,i)=>x['r_'+k]=i+1); };
-  ['pk','sa','saf','att','blk','ot'].forEach(k=>rankOf(k,false));  // #1 = highest value
+  ['pk','sa','saf','att','blk','ot','gf','ga','diff','sf','xgf','xga','ppg','pkga'].forEach(k=>rankOf(k,false));  // #1 = highest value
   rankOf('def', true);                                            // #1 = best defence
   const good = (k, r) => { const n = R.length; if (k==='def') return r>n*2/3?'g':r<=n/3?'r':'n';
     if (k==='blk') return r>n*2/3?'g':r<=n/3?'r':'n';             // few blocks help shooters
     return r<=n/3?'g':r>n*2/3?'r':'n'; };                         // more shots/attempts/PK time/on-target help shooters
-  const fmt = (k,v) => k==='pk'?mmss(v):k==='blk'||k==='ot'?v+'%':v;
+  const fmt = (k,v) => k==='pk'?mmss(v):k==='blk'||k==='ot'?v+'%':(['gf','ga','sf','xgf','xga','ppg','pkga','diff'].includes(k)?v.toFixed(2):v);
   const rows = R.slice().sort((a,b)=>{ const x=a[rkKey], y=b[rkKey]; const c = typeof x==='string'?x.localeCompare(y):(x-y); return rkAsc?c:-c; });
   const head = RK_COLS.map(([k,l])=>`<th class="${k===rkKey?'on':''}"><button data-rk="${k}">${l}${k===rkKey?(rkAsc?' ▲':' ▼'):''}</button></th>`).join('');
   const body = rows.map(r=>`<tr><td><b>${r.team}</b> <small>${r.gp} GP</small></td>${RK_COLS.slice(1).map(([k])=>r[k]==null?'<td>n/a</td>':`<td><span class="rk-c ${good(k,r['r_'+k])}">${fmt(k,r[k])} <small>#${r['r_'+k]}</small></span></td>`).join('')}</tr>`).join('');
-  $('#gamesbox').innerHTML = `<div class="gtop"><h3>Team rankings, this season only</h3><div class="gp">Tap a column title to sort (tap again to flip). <span class="rk-c g">Green</span> = best matchup for shooters, <span class="rk-c r">red</span> = toughest. #1 is the highest number for every column except current defence rank, where #1 is the best defence. Shots to forwards and the other defensive numbers come from this season's games only.</div></div><div style="overflow-x:auto"><table class="rk"><tr>${head}</tr>${body}</table></div>`;
+  $('#gamesbox').innerHTML = `<div class="gtop"><h3>Team rankings, this season only</h3><div class="gp">Tap a column title to sort (tap again to flip). <span class="rk-c g">Green</span> = best matchup for shooters, <span class="rk-c r">red</span> = toughest. #1 is the highest number for every column except current defence rank, where #1 is the best defence. Shots to forwards and the other defensive numbers come from this season's games only. Team-stat columns (goals, shots, xG, PP/PK per game): #1 = highest, green = top third. For the against columns that means the leakiest defence.</div></div><div style="overflow-x:auto"><table class="rk"><tr>${head}</tr>${body}</table></div>`;
   $('#count').textContent = R.length + ' teams';
   $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
 }
