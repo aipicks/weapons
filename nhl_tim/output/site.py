@@ -68,6 +68,9 @@ def _posx(pid, fallback):
     return _POSMAP.get(pid) or ("Defense" if fallback == "D" else "Forward")
 
 
+_RK2 = {"gf", "ga", "diff", "sf", "xgf", "xga", "ppg", "pkga"}
+
+
 def _rankings_payload(con):
     """Every team's defensive numbers for THIS season only, for the Rankings tab."""
     from ..posshots import current_defense
@@ -96,7 +99,7 @@ def _rankings_payload(con):
             t["pkga"] = r["ga"] / r["gp"]
     for t, d in cd.items():
         teams.setdefault(t, {})["def"] = d["rank"]
-    return [dict(team=t, **{k: (round(v, 1) if isinstance(v, float) else v) for k, v in d.items()})
+    return [dict(team=t, **{k: (round(v, 2 if k in _RK2 else 1) if isinstance(v, float) else v) for k, v in d.items()})
             for t, d in sorted(teams.items()) if d.get("gp")]
 
 
