@@ -106,6 +106,7 @@ h1 span{color:var(--accent)}
 .filters{display:flex;gap:6px;flex-wrap:wrap}
 .filters select,.filters input{font:500 13px var(--body);background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
 .filters input{flex:1 1 130px}
+.gk{margin:6px 0}.gk .sub,.glog{font:11px var(--mono);color:var(--muted)}.glog{margin:2px 0 4px 8px}.gk .bk{margin:4px 0 0 8px;padding-left:8px;border-left:2px solid var(--line)}
 .gpanel{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 .gpanel summary{cursor:pointer;padding:9px 12px;font:600 15px var(--display);letter-spacing:.05em;text-transform:uppercase}
 .gpanel summary small{font:400 11px var(--mono);color:var(--muted);text-transform:none;letter-spacing:0;margin-left:6px}
@@ -297,31 +298,33 @@ function sogRow(r){
 }
 const lab = l => ({BET:'good', LEAN:'warn', PASS:''}[l]);
 const evs = v => (v>0?'+':'')+v.toFixed(1)+'%';
-const stat = (a,b,d=1,suf='') => `${a==null?'?':a.toFixed(d)+suf} → ${b==null?'?':b.toFixed(d)+suf}`;
+const stat = (b,d=1,suf='') => b==null?'?':b.toFixed(d)+suf;
 const BOOKSHORT = b => b.replace('espnbet','ESPN').replace('draftkings','DK').replace('fanduel','FD').replace('betmgm','MGM').replace('bovada','Bov').replace('caesars','CZR').replace('caesars','CZR');
 function gcard(g){
   const m = g.ml, t = g.total, sp = '<span class="sep">|</span>';
-  const gk = (x,tm) => x ? `${tm} ${esc(x.name)} <span class="tag ${STC[x.status]}">${x.status}</span>` : `${tm} no goalie listed`;
+  const gseas = x => x ? `${x.gaa.toFixed(2)} GAA ${rk(x.gr, x.gc)} ${'·'} ${String(x.sv.toFixed(3)).replace(/^0/,'')} SV% ${rk(x.svr, x.svc)} ${'·'} ${x.gp} GP${x.starts!=null?' / '+x.starts+' GS':''}` : 'no games this season';
+  const glog = l => !l || !l.length ? '<div class="glog">no game log yet</div>' : `<div class="glog">${l.map(e=>`<div>${e.d} ${e.ha} ${e.opp} ${'·'} ${e.dec==='W'?'W':e.dec==='L'?'L':e.dec==='O'?'OTL':e.dec} ${'·'} ${e.sa==null?'?':e.sa-e.ga+'/'+e.sa} saves, ${e.ga==null?'?':e.ga} GA ${e.sv==null?'':'('+String(e.sv.toFixed(3)).replace(/^0/,'')+')'}${e.gs===0?' <small>(relief)</small>':''}</div>`).join('')}</div>`;
+  const gk = (x,tm) => x ? `<div class="gk"><b>${tm} ${esc(x.name)}</b> <span class="tag ${STC[x.status]}">${x.status}</span><div class="sub">${gseas(x.c)}</div>${glog(x.log)}${x.backup?`<div class="bk">Backup if he sits: <b>${esc(x.backup.name)}</b><div class="sub">${gseas(x.backup.c)}</div>${glog(x.backup.log)}</div>`:''}</div>` : `<div class="gk">${tm} no goalie listed</div>`;
   const bet = (title, b, lbl) => b ? `<div class="bet ${lab(lbl)}"><span class="mk">${title}</span><b>${b.team?esc(b.team)+(b.line!=null&&b.side!=='Over'&&b.side!=='Under'?' '+(b.line>0?'+':'')+b.line:' ML'):b.side+' '+b.line} ${b.price}</b> <small>${BOOKSHORT(b.book)}</small><span class="bp">our ${b.p}% vs market ${b.market}% ${sp} EV <b>${evs(b.ev)}</b> <span class="tag ${lab(lbl)}">${lbl}</span></span></div>` : '';
   const h = g.st.home, a = g.st.away;
   const row = (l, ax, hx) => `<tr><td>${l}</td><td>${ax}</td><td>${hx}</td></tr>`;
   return `<article class="gcard">
     <div class="ghead"><b>${g.away} @ ${g.home}</b><span>${g.time.replace(' PM','')}</span>${g.b2b.away?`<span class="tag bad">${g.away} B2B</span>`:''}${g.b2b.home?`<span class="tag bad">${g.home} B2B</span>`:''}</div>
-    <div class="gg2">${gk(g.ga,g.away)}<br>${gk(g.gh,g.home)}</div>
+    <div class="gg2">${gk(g.ga,g.away)}${gk(g.gh,g.home)}</div>
     <div class="gm2">
       <div><h4>Market (FanDuel)</h4><div>ML ${g.away} <b>${g.mkt.ml_a||'?'}</b> / ${g.home} <b>${g.mkt.ml_h||'?'}</b></div>${g.spread?`<div>Puck line ${g.spread.away} / ${g.spread.home}</div>`:''}<div>Total <b>${g.mkt.line??'?'}</b> (O ${g.mkt.over||'?'} / U ${g.mkt.under||'?'})</div></div>
       <div><h4>Our projection</h4><div>${g.away} <b>${g.lamA.toFixed(2)}</b> – ${g.home} <b>${g.lamH.toFixed(2)}</b> goals (total ${g.tot.toFixed(2)})</div>${m?`<div>Win: ${g.away} ${(100-m.model_h).toFixed(1)}% / ${g.home} ${m.model_h.toFixed(1)}% <small>(market ${(100-m.fair_h).toFixed(1)}% / ${m.fair_h.toFixed(1)}%)</small></div>`:''}</div>
     </div>
     ${bet('MONEYLINE', m&&m.best, m&&m.label)}${g.spread ? bet('PUCK LINE', g.spread.best, g.spread.label) : ''}${bet('TOTAL', t&&t.best, t&&t.label)}
-    <table class="cmp"><tr><th>25–26 → 26–27</th><th>${g.away}</th><th>${g.home}</th></tr>
-      ${row('xG share (all)', stat(a.xgp,a.xgc,1,'%'), stat(h.xgp,h.xgc,1,'%'))}
-      ${row('xG share 5v5', stat(a.ev_xgp,a.ev_xgc,1,'%'), stat(h.ev_xgp,h.ev_xgc,1,'%'))}
-      ${row('Goals for/G', stat(a.gf_p,a.gf_c,2), stat(h.gf_p,h.gf_c,2))}
-      ${row('Goals against/G', stat(a.ga_p,a.ga_c,2), stat(h.ga_p,h.ga_c,2))}
-      ${row('Shots for/G', stat(a.sf_p,a.sf_c), stat(h.sf_p,h.sf_c))}
-      ${row('Shots against/G', stat(a.sa_p,a.sa_c), stat(h.sa_p,h.sa_c))}
-      ${row('Power play %', stat(a.pp_p,a.pp_c,1,'%'), stat(h.pp_p,h.pp_c,1,'%'))}
-      ${row('Penalty kill %', stat(a.pk_p,a.pk_c,1,'%'), stat(h.pk_p,h.pk_c,1,'%'))}
+    <table class="cmp"><tr><th>26–27 season</th><th>${g.away}</th><th>${g.home}</th></tr>
+      ${row('xG share (all)', stat(a.xgc,1,'%'), stat(h.xgc,1,'%'))}
+      ${row('xG share 5v5', stat(a.ev_xgc,1,'%'), stat(h.ev_xgc,1,'%'))}
+      ${row('Goals for/G', stat(a.gf_c,2), stat(h.gf_c,2))}
+      ${row('Goals against/G', stat(a.ga_c,2), stat(h.ga_c,2))}
+      ${row('Shots for/G', stat(a.sf_c), stat(h.sf_c))}
+      ${row('Shots against/G', stat(a.sa_c), stat(h.sa_c))}
+      ${row('Power play %', stat(a.pp_c,1,'%'), stat(h.pp_c,1,'%'))}
+      ${row('Penalty kill %', stat(a.pk_c,1,'%'), stat(h.pk_c,1,'%'))}
     </table>
     <div class="lines">${g.books.map(b=>`${BOOKSHORT(b.b)}: ML ${b.ma||'?'}/${b.mh||'?'} · ${b.t??'?'} (O ${b.o||'?'}/U ${b.u||'?'})`).join('<br>')}</div>
   </article>`;

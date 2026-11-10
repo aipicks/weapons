@@ -371,6 +371,23 @@ def _sog_payload(con, date, eids=None):
     return out
 
 
+def _goalie_log(gid, n=5):
+    """Last n regular-season starts/appearances (newest first) from the NHL game log, [] if unknown."""
+    if not gid:
+        return []
+    from ..sources import nhl_api
+    try:
+        log = nhl_api.game_log_gt(gid, CUR_SEASON, 2, force=True)
+    except Exception:
+        return []
+    out = []
+    for g in log[:n]:
+        out.append({"d": g["gameDate"][5:], "opp": g.get("opponentAbbrev"), "ha": "vs" if g.get("homeRoadFlag") == "H" else "@",
+                    "dec": g.get("decision") or "-", "sa": g.get("shotsAgainst"), "ga": g.get("goalsAgainst"),
+                    "sv": None if g.get("savePctg") is None else round(g["savePctg"], 3), "gs": g.get("gamesStarted")})
+    return out
+
+
 def _games_payload(con, date, eids=None):
     def f1(x, d=1):
         return None if x is None else round(x, d)
@@ -385,16 +402,20 @@ def _games_payload(con, date, eids=None):
             continue
         tm, _ = _et(g["start"])
 
-        def gl(row):
+        def gl(row, team):
             if not row or not row["goalie_name"]:
                 return None
-            return {"name": row["goalie_name"], "status": STATUS.get(row["status"], "Unconfirmed")}
+            gid = row["goalie_id"] if "goalie_id" in row.keys() else None
+            cur = _goalie_season(con, con.execute("SELECT * FROM goalie_season WHERE nhl_id=? AND season=?", (gid, CUR_SEASON)).fetchone()) if gid else None
+            bk = _backup(con, team, gid)
+            return {"name": row["goalie_name"], "status": STATUS.get(row["status"], "Unconfirmed"), "c": cur, "log": _goalie_log(gid),
+                    "backup": None if not bk else {"name": bk["name"], "c": bk["c"], "log": _goalie_log(con.execute("SELECT nhl_id FROM team_goalies WHERE team=? AND name=?", (team, bk["name"])).fetchone()[0])}}
         ml, tot = g["ml"], g["total"]
         ref = next((b for b in g["books"] if b["book"] == "fanduel"), g["books"][0] if g["books"] else None)
         out.append({
             "eid": g["eid"], "start": g["start"], "time": tm, "home": g["home"], "away": g["away"],
             "lamH": round(g["lamH"], 2), "lamA": round(g["lamA"], 2), "tot": round(g["lamH"] + g["lamA"], 2),
-            "b2b": g["b2b"], "gh": gl(g["goalie_home"]), "ga": gl(g["goalie_away"]),
+            "b2b": g["b2b"], "gh": gl(g["goalie_home"], g["home"]), "ga": gl(g["goalie_away"], g["away"]),
             "pre": {"home": round(g["p_home_model"] * 100, 1), "away": round((1 - g["p_home_model"]) * 100, 1)},
             "mkt": {"ml_h": fmt_american(ref["ml_home"]) if ref and ref["ml_home"] is not None else None,
                     "ml_a": fmt_american(ref["ml_away"]) if ref and ref["ml_away"] is not None else None,
