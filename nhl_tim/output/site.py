@@ -207,7 +207,8 @@ def _pkr(ranks, team):
     if team not in ranks:
         return None
     r, n = ranks[team]
-    return {"r": r, "n": n, "c": team_color(n + 1 - r, n)}  # most shorthanded time is the best spot for a PP player
+    # shown rank is reversed (#1 = least shorthanded time); colour still says most shorthanded time = best spot for a PP player
+    return {"r": n + 1 - r, "n": n, "c": team_color(n + 1 - r, n)}
 
 
 def _rows(con, rows):
