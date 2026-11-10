@@ -221,6 +221,7 @@ const smBadge = t => { if (!t) return '';
 const tmBadge = t => { if (!t) return '';
   const c = t.score >= 3 ? 'good' : t.score < 2 ? 'bad' : 'warn';
   return `<span class="tmx ${c}" title="Team matchup score, 1 to 4 (4 = best): opposing goalie + team offence + opposing defence">TEAM<b>${t.score.toFixed(1)}</b>of 4</span>`; };
+const xgCol = v => { const c = D.xgcuts; return !c ? 'c-gray' : v < c[0] ? 'c-red' : v >= c[1] ? 'c-green' : 'c-gray'; };
 const tgS = (t, tag) => t ? `${tag} <span class="${col(t.c)}"><b>${t.gpg}</b>/G (#${t.rank} of ${t.n}, ${t.gp} GP)</span> ${'·'} expected ${t.xgpg}/G` : `${tag} N/A`;
 function row(r){
   const [ppt, ppc] = PP[r.pp];
@@ -235,7 +236,7 @@ function row(r){
   const any = r.any ? `${r.any.am} (${r.any.pr}%)` : 'N/A';
   const od = (r.opp_d ? `25–26 <span class="${col(r.opp_d.c)}">${r.opp_d.ga.toFixed(2)} GA/G (#${r.opp_d.rank})</span>` : '25–26 N/A')
     + ` ${sp} ` + (r.opp_c ? `26–27 <span class="${col(r.opp_c.c)}">${r.opp_c.ga.toFixed(2)} GA/G (#${r.opp_c.rank}, ${r.opp_c.gp} GP)</span>` : '26–27 N/A')
-    + ` ${sp} Preseason projected defence ranking <span class="${col(r.opp_pre.c)}">#${r.opp_pre.rank}${r.opp_pre.tie?' (tied)':''}</span>`;
+    + (view==='tim' ? '' : ` ${sp} Preseason projected defence ranking <span class="${col(r.opp_pre.c)}">#${r.opp_pre.rank}${r.opp_pre.tie?' (tied)':''}</span>`);
   const gb = r.goalie ? `<b>${esc(r.goalie.name)} — ${r.goalie.status}</b>
       <span class="sub2">25–26: ${gline(r.goalie.p)}</span>
       <span class="sub2">26–27: ${gline(r.goalie.c)}</span>` : 'No goalie listed yet';
@@ -250,10 +251,10 @@ function row(r){
     <div class="detail">
       <div class="ln"><span class="lab">25–26</span><span class="v">${s25}</span></div>
       <div class="ln"><span class="lab">26–27</span><span class="v">${s26}</span></div>
-      ${view==='tim' && r.tg ? `<div class="ln"><span class="lab">Team goals</span><span class="v">${r.team} goals scored per game: ${tgS(r.tg.p,'25–26')} ${sp} ${tgS(r.tg.c,'26–27')}</span></div>` : ''}
+      ${view==='tim' && r.tg ? `<div class="ln"><span class="lab">Team goals</span><span class="v">${r.team} goals scored per game: ${tgS(r.tg.c,'26–27')}</span></div>` : ''}
       ${r.ppg ? `<div class="ln"><span class="lab">PP goals</span><span class="v">${ppgS(r.ppg.p,'25–26')} ${sp} ${ppgS(r.ppg.c,'26–27')}</span></div>` : ''}
-      <div class="ln"><span class="lab">PP time</span><span class="v">25–26: ${r.ppt.p||'0:00'}/G ${sp} 26–27: ${r.ppt.c||'0:00'}/G<br>${r.opp} PK time: 25–26: ${r.ppt.opk_p||'?'}/G ${sp} 26–27: ${r.ppt.opk_c||'?'}/G${pkRank(r.ppt.opk_r)}</span></div>
-      <div class="ln"><span class="lab">Bets</span><span class="v">Anytime ${any} ${sp} ${gm} ${sp} ${r.team} ${r.xg!=null?r.xg.toFixed(2):'?'} xG</span></div>
+      ${view==='tim' ? `<div class="ln"><span class="lab">PP time</span><span class="v">26–27: ${r.ppt.c||'0:00'}/G<br>${r.opp} PK time: 26–27: ${r.ppt.opk_c||'?'}/G${pkRank(r.ppt.opk_r)}</span></div>` : `<div class="ln"><span class="lab">PP time</span><span class="v">25–26: ${r.ppt.p||'0:00'}/G ${sp} 26–27: ${r.ppt.c||'0:00'}/G<br>${r.opp} PK time: 25–26: ${r.ppt.opk_p||'?'}/G ${sp} 26–27: ${r.ppt.opk_c||'?'}/G${pkRank(r.ppt.opk_r)}</span></div>`}
+      <div class="ln"><span class="lab">Bets</span><span class="v">Anytime ${any} ${sp} ${gm} ${sp} ${r.team} ${r.xg!=null?`<span class="${xgCol(r.xg)}">${r.xg.toFixed(2)}</span>`:'?'} xG</span></div>
       <div class="ln"><span class="lab">Opp D</span><span class="v">${r.opp} ${od}</span></div>
       <div class="ln"><span class="lab">Goalie</span><span class="v">${gb}</span></div>
     </div></article>`;

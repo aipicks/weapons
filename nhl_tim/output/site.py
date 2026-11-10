@@ -103,6 +103,17 @@ def _rankings_payload(con):
             for t, d in sorted(teams.items()) if d.get("gp")]
 
 
+def _xg_cuts(con):
+    """Tercile cutoffs of this season's team xG-for per game (all situations): [low/mid, mid/high]."""
+    v = sorted(r["xgf"] / r["gp"] for r in con.execute("SELECT gp, xgf FROM team_mp WHERE season=? AND sit='all' AND gp>0", (CUR_SEASON,)))
+    if len(v) < 3:
+        return None
+    n = len(v)
+    lo = (v[n // 3 - 1] + v[n // 3]) / 2 if n % 3 == 0 else (v[round(n / 3) - 1] + v[round(n / 3)]) / 2
+    hi = (v[n - round(n / 3) - 1] + v[n - round(n / 3)]) / 2
+    return [round(lo, 2), round(hi, 2)]
+
+
 def _lineups_payload(con):
     """Lines and pairs per team from Daily Faceoff plus the two goalies ranked G1/G2 by projected starts."""
     gp26 = {r["team"]: r["gp"] for r in con.execute("SELECT team, gp FROM team_season WHERE season=?", (CUR_SEASON,))}
@@ -498,7 +509,7 @@ def build_site(date):
                             "off": round(m["off"], 2) if m["off"] is not None else None, "p_off": round(m["p_off"] * 100),
                             "def": round(m["def_score"], 1), "p_def": round(m["p_def"] * 100),
                             "score": round(m["score"], 1)} for m in matchups],
-               "rankings": _rankings_payload(con), "lineups": _lineups_payload(con), "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, pool_eids), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
+               "rankings": _rankings_payload(con), "xgcuts": _xg_cuts(con), "lineups": _lineups_payload(con), "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, pool_eids), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")
