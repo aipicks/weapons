@@ -329,7 +329,10 @@ def build_game_rows(con, date):
                   "home_price": ref_sp["home_price"], "away_line": ref_sp["away_line"], "away_price": ref_sp["away_price"],
                   "model_home_cover": cover_prob(pmf, ref_sp["home_line"])[0]}
 
-        def stats(team):
+        _lg = {}
+        _RK = {"xgc": True, "ev_xgc": True, "gf_c": True, "ga_c": False, "sf_c": True, "sa_c": False, "pp_c": True, "pk_c": True}  # True = higher is better
+
+        def stats(team, ranks=True):
             sp, sc = tm.get((team, PREV_SEASON), {}), tm.get((team, CUR_SEASON), {})
             def pct(sits):
                 a = sits.get("all")
@@ -341,7 +344,7 @@ def build_game_rows(con, date):
                 a = sits.get("5on5")
                 return a["xgf"] / (a["xgf"] + a["xga"]) * 100 if a and (a["xgf"] + a["xga"]) else None
             npv, ncu = nhl_by_ab_prev.get(team), nhl_by_ab_cur.get(team)
-            return {"xgp": pct(sp), "xgc": pct(sc), "ev_xgp": ev_pct(sp), "ev_xgc": ev_pct(sc),
+            res = {"xgp": pct(sp), "xgc": pct(sc), "ev_xgp": ev_pct(sp), "ev_xgc": ev_pct(sc),
                     "gf_p": per_game(sp, "gf"), "gf_c": per_game(sc, "gf"), "ga_p": per_game(sp, "ga"), "ga_c": per_game(sc, "ga"),
                     "sf_p": per_game(sp, "sf"), "sf_c": per_game(sc, "sf"), "sa_p": per_game(sp, "sa"), "sa_c": per_game(sc, "sa"),
                     "pp_p": npv["powerPlayPct"] * 100 if npv and npv.get("powerPlayPct") is not None else None,
@@ -349,6 +352,18 @@ def build_game_rows(con, date):
                     "pk_p": npv["penaltyKillPct"] * 100 if npv and npv.get("penaltyKillPct") is not None else None,
                     "pk_c": ncu["penaltyKillPct"] * 100 if ncu and ncu.get("penaltyKillPct") is not None else None,
                     "gp_c": (sc.get("all") or {}).get("gp", 0)}
+            if ranks:
+                if "league" not in _lg:
+                    teams_ = {t for (t, se) in tm if se == CUR_SEASON}
+                    _lg["league"] = {t: stats(t, False) for t in teams_}
+                res["rk"] = {}
+                for k, hi in _RK.items():
+                    v = res.get(k)
+                    vals = [x[k] for x in _lg["league"].values() if x.get(k) is not None]
+                    if v is not None and vals:
+                        better = sum(1 for x in vals if (x > v if hi else x < v))
+                        res["rk"][k] = [better + 1, len(vals)]
+            return res
 
         out.append({"eid": eid, "start": g["start_utc"], "home": home, "away": away, "lamH": lamH, "lamA": lamA,
                     "h": h_calc, "a": a_calc, "p_home_model": p_home_model, "reg": reg, "ml": ml, "total": tot, "spread": pl,

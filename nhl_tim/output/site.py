@@ -435,7 +435,7 @@ def _games_payload(con, date, eids=None):
                        "ma": fmt_american(b["ml_away"]) if b["ml_away"] is not None else None, "t": b["total"],
                        "o": fmt_american(b["over"]) if b["over"] is not None else None,
                        "u": fmt_american(b["under"]) if b["under"] is not None else None} for b in g["books"]],
-            "st": {k: {kk: f1(vv, 2) if kk not in ("gp_c",) else vv for kk, vv in v.items()} for k, v in g["stats"].items()},
+            "st": {k: {kk: (f1(vv, 2) if kk not in ("gp_c", "rk") else vv) for kk, vv in v.items()} for k, v in g["stats"].items()},
             "parts": {"h": {k: f1(v, 2) for k, v in g["h"].items()}, "a": {k: f1(v, 2) for k, v in g["a"].items()}},
         })
     return out
