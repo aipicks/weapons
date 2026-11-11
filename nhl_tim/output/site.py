@@ -211,7 +211,45 @@ def _pkr(ranks, team):
     return {"r": n + 1 - r, "n": n, "c": team_color(n + 1 - r, n)}
 
 
-def _rows(con, rows):
+def _pre_nhl(nhl_id, n=3):
+    """A rookie's last n seasons before this one outside the NHL (college, junior, Europe...): main regular-season league each year, newest first."""
+    from ..sources import nhl_api
+    try:
+        j = nhl_api.get(f"{nhl_api.WEB}/player/{nhl_id}/landing", f"landing/{nhl_id}", force=True)
+    except Exception:
+        return []
+    best = {}
+    for t in (j or {}).get("seasonTotals", []):
+        if t.get("gameTypeId") != 2 or t["season"] >= CUR_SEASON or t.get("leagueAbbrev") == "NHL":
+            continue
+        k = t["season"]
+        if k not in best or t["gamesPlayed"] > best[k]["gamesPlayed"]:
+            best[k] = t
+    out = []
+    for k in sorted(best, reverse=True)[:n]:
+        t = best[k]
+        out.append({"s": f"{str(k)[2:4]}–{str(k)[6:8]}", "lg": t["leagueAbbrev"], "gp": t["gamesPlayed"], "g": t.get("goals", 0)})
+    return out
+
+
+def _gg_hist(nhl_id, n=5):
+    """Goal-game % for up to the previous n NHL seasons actually played (newest first); a player with none gets his last 3 non-NHL seasons instead."""
+    from ..sources import nhl_api
+    nhl = []
+    season = PREV_SEASON
+    for _ in range(n):
+        try:
+            log = nhl_api.game_log(nhl_id, season)
+        except Exception:
+            log = []
+        if log:
+            gg = sum(1 for g in log if g["goals"] > 0)
+            nhl.append({"s": f"{str(season)[2:4]}–{str(season)[6:8]}", "gp": len(log), "gg": gg, "pct": round(gg / len(log) * 100, 1)})
+        season -= 10001
+    return {"nhl": nhl, "pre": None if nhl else _pre_nhl(nhl_id)}
+
+
+def _rows(con, rows, hist=False):
     pkr = _pk_ranks(con)
     tgoals = _team_goals(con)
     out = []
@@ -272,6 +310,7 @@ def _rows(con, rows):
             "pool": r["pool"], "rank": rk, "n": n, "tier": tier, "start": r["start"],
             "game_name": f"{r['away']} @ {r['home']}", "time": tm, "eid": r["event_id"],
             "name": r["name"], "team": r["team"], "opp": r["opp"], "pos": r["pos"], "posx": _posx(r["nhl_id"], r["pos"]), "chg": r["team_changed"],
+            "gg5": _gg_hist(r["nhl_id"]) if hist else None,
             "p": round(r["p"] * 100, 1), "pm": round(r["p_mkt"] * 100, 1) if r["p_mkt"] else None,
             "pp": r["pp_unit"], "ev": ev, "edge": edge, "line": line, "sk": sk,
             "tm": {"score": round(_TM[r["team"]]["score"], 1)} if r["team"] in _TM else None,
@@ -525,7 +564,7 @@ def build_site(date):
     _TM.update({m["team"]: m for m in matchups})
     meta = {k: (con.execute("SELECT value FROM meta WHERE key=?", (k,)).fetchone() or [None])[0]
             for k in ("last_pp_update", "daily_updated")}
-    payload = {"date": date, "rows": _rows(con, rows), "all": _rows(con, all_rows), "meta": meta,
+    payload = {"date": date, "rows": _rows(con, rows, True), "all": _rows(con, all_rows), "meta": meta,
                "matchups": [{"team": m["team"], "opp": m["opp"], "home": m["home"],
                             "goalie": m["goalie"], "status": m["status"], "gf": round((m["gf"] - 1) * 100, 1), "p_goalie": round(m["p_goalie"] * 100),
                             "off": round(m["off"], 2) if m["off"] is not None else None, "p_off": round(m["p_off"] * 100),
