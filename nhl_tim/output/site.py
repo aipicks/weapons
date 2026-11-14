@@ -114,6 +114,52 @@ def _xg_cuts(con):
     return [round(lo, 2), round(hi, 2)]
 
 
+def _splits_payload(con, date):
+    """Betting splits from Sports Betting Dime: share of bets and share of money (stake) on each side of the moneyline, puck line and total."""
+    import requests
+    from ..normalize import norm_team
+    url = ("https://www.sportsbettingdime.com/wp-json/adpt/v1/nhl-odds?books=sr%3Abook%3A18149%2Csr%3Abook%3A18186%2Csr%3Abook%3A17324&format=us")
+    try:
+        j = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30).json()
+    except Exception:
+        return []
+    ours = {(g["away"], g["home"]): g for g in con.execute("SELECT * FROM game WHERE date=?", (date,))}
+    out = []
+    for g in j.get("data", []):
+        comp = g.get("competitors", {})
+        away, home = norm_team(comp["away"]["abbreviation"]), norm_team(comp["home"]["abbreviation"])
+        mine = ours.get((away, home))
+        bs = g.get("bettingSplits") or {}
+        if not mine or not bs:
+            continue
+        mk = g.get("markets") or {}
+
+        def book(kind):
+            bks = (mk.get(kind) or {}).get("books", [])
+            return next((b for b in bks if b["name"] == "DraftKings"), bks[0] if bks else None)
+
+        def side(kind, key, name, bk, sp_key=None):
+            sp = (bs.get(kind) or {}).get(key) or {}
+            o = (bk or {}).get(key) or {}
+            line = None
+            if kind == "spread":
+                line = o.get("spread")
+            elif kind == "total":
+                line = (bk or {}).get("total")
+            return {"n": name, "odds": o.get("odds"), "v": line, "t": None if sp.get("betsPercentage") is None else round(sp["betsPercentage"]), "m": None if sp.get("stakePercentage") is None else round(sp["stakePercentage"])}
+        ml = [side("moneyline", "away", away, book("moneyline")), side("moneyline", "home", home, book("moneyline"))]
+        spb = book("spread")
+        sp = [side("spread", "away", away, spb), side("spread", "home", home, spb)]
+        tb = book("total")
+        tt = [side("total", "over", "Over", tb), side("total", "under", "Under", tb)]
+        if not any(x["t"] is not None for x in ml + sp + tt):
+            continue
+        tm, _ = _et(mine["start_utc"])
+        out.append({"game": f"{away} @ {home}", "time": tm, "start": mine["start_utc"], "ml": ml, "sp": sp, "tot": tt})
+    out.sort(key=lambda r: r["start"])
+    return out
+
+
 def _lineups_payload(con):
     """Lines and pairs per team from Daily Faceoff plus the two goalies ranked G1/G2 by projected starts."""
     gp26 = {r["team"]: r["gp"] for r in con.execute("SELECT team, gp FROM team_season WHERE season=?", (CUR_SEASON,))}
@@ -570,7 +616,7 @@ def build_site(date):
                             "off": round(m["off"], 2) if m["off"] is not None else None, "p_off": round(m["p_off"] * 100),
                             "def": round(m["def_score"], 1), "p_def": round(m["p_def"] * 100),
                             "score": round(m["score"], 1)} for m in matchups],
-               "rankings": _rankings_payload(con), "xgcuts": _xg_cuts(con), "lineups": _lineups_payload(con), "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, pool_eids), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
+               "rankings": _rankings_payload(con), "xgcuts": _xg_cuts(con), "splits": _splits_payload(con, date), "lineups": _lineups_payload(con), "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, pool_eids), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")
