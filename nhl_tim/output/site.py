@@ -114,6 +114,13 @@ def _xg_cuts(con):
     return [round(lo, 2), round(hi, 2)]
 
 
+def _pct(v):
+    try:
+        return None if v in (None, "") else round(float(v))
+    except (TypeError, ValueError):
+        return None
+
+
 def _splits_payload(con, date):
     """Betting splits from Sports Betting Dime: share of bets and share of money (stake) on each side of the moneyline, puck line and total."""
     import requests
@@ -146,7 +153,7 @@ def _splits_payload(con, date):
                 line = o.get("spread")
             elif kind == "total":
                 line = (bk or {}).get("total")
-            return {"n": name, "odds": o.get("odds"), "v": line, "t": None if sp.get("betsPercentage") is None else round(sp["betsPercentage"]), "m": None if sp.get("stakePercentage") is None else round(sp["stakePercentage"])}
+            return {"n": name, "odds": o.get("odds"), "v": line, "t": _pct(sp.get("betsPercentage")), "m": _pct(sp.get("stakePercentage"))}
         ml = [side("moneyline", "away", away, book("moneyline")), side("moneyline", "home", home, book("moneyline"))]
         spb = book("spread")
         sp = [side("spread", "away", away, spb), side("spread", "home", home, spb)]
@@ -158,6 +165,14 @@ def _splits_payload(con, date):
         out.append({"game": f"{away} @ {home}", "time": tm, "start": mine["start_utc"], "ml": ml, "sp": sp, "tot": tt})
     out.sort(key=lambda r: r["start"])
     return out
+
+
+def _safe_splits(con, date):
+    try:
+        return _splits_payload(con, date)
+    except Exception as e:  # splits are a bonus tab: never let a bad feed break the board
+        print("splits failed:", e)
+        return []
 
 
 def _lineups_payload(con):
@@ -616,7 +631,7 @@ def build_site(date):
                             "off": round(m["off"], 2) if m["off"] is not None else None, "p_off": round(m["p_off"] * 100),
                             "def": round(m["def_score"], 1), "p_def": round(m["p_def"] * 100),
                             "score": round(m["score"], 1)} for m in matchups],
-               "rankings": _rankings_payload(con), "xgcuts": _xg_cuts(con), "splits": _splits_payload(con, date), "lineups": _lineups_payload(con), "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, pool_eids), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
+               "rankings": _rankings_payload(con), "xgcuts": _xg_cuts(con), "splits": _safe_splits(con, date), "lineups": _lineups_payload(con), "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, pool_eids), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")
