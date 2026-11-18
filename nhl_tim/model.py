@@ -199,7 +199,7 @@ def build_rows(con, date, all_players=False):
             return b_ if a_ is None else (1 - wc) * a_ + wc * b_
         pp_sec = _mix(pp_t[PREV_SEASON], pp_t[CUR_SEASON]) or 0.0
         toi_sec = _mix(toi_p["toi_pg"] if toi_p else None, toi_c["toi_pg"] if toi_c else None)
-        oc_ = con.execute("SELECT gp, ga_pg FROM team_season WHERE team=? AND season=?", (opp, CUR_SEASON)).fetchone()
+        oc_ = con.execute("SELECT gp, ga_pg, ga_rank FROM team_season WHERE team=? AND season=?", (opp, CUR_SEASON)).fetchone()
         wo = (oc_["gp"] / (oc_["gp"] + W["opp_k"])) if oc_ else 0.0
         pk_sec = pk_t[PREV_SEASON] if wo == 0 or pk_t[CUR_SEASON] is None else (1 - wo) * (pk_t[PREV_SEASON] or pk_t[CUR_SEASON]) + wo * pk_t[CUR_SEASON]
         exp_pp = pp_sec * (pk_sec / league_pk) if pk_sec and league_pk else pp_sec
@@ -257,7 +257,7 @@ def build_rows(con, date, all_players=False):
             word = "High" if d > 0.12 else "Low" if d < -0.12 else "Average"
             reasons.append((d, cls(d, 0.12), f"{word} team implied total ({xg:.2f})", "xg"))
         if opp_t:
-            rkv = opp_t["ga_rank"]
+            rkv = oc_["ga_rank"] if oc_ and oc_["ga_rank"] else opp_t["ga_rank"]  # same this-season rank the Opp D line shows
             c = "n" if rkv <= 10 else "p" if rkv >= 21 else "z"
             reasons.append(((rkv - 16.5) / 16.5, c,
                             f"{'Favorable' if c == 'p' else 'Tough' if c == 'n' else 'Average'} opponent GA/G (#{rkv})", "opp"))
