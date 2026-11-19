@@ -293,6 +293,24 @@ def _pre_nhl(nhl_id, n=3):
     return out
 
 
+def _last10(nhl_id, n=10):
+    """Goals in each of the player's last n regular-season games (newest first), topped up from last season early in the year."""
+    from ..sources import nhl_api
+    out = []
+    for season, force in ((CUR_SEASON, True), (PREV_SEASON, False)):
+        try:
+            log = nhl_api.game_log_gt(nhl_id, season, 2, force=force)
+        except Exception:
+            log = []
+        for g in log:
+            if len(out) >= n:
+                break
+            out.append({"d": g["gameDate"][5:], "opp": g.get("opponentAbbrev"), "ha": "vs" if g.get("homeRoadFlag") == "H" else "@", "g": g.get("goals", 0), "a": g.get("assists", 0), "s": g.get("shots")})
+        if len(out) >= n:
+            break
+    return out
+
+
 def _gg_hist(nhl_id, n=5):
     """Goal-game % for up to the previous n NHL seasons actually played (newest first); a player with none gets his last 3 non-NHL seasons instead."""
     from ..sources import nhl_api
@@ -372,6 +390,7 @@ def _rows(con, rows, hist=False):
             "game_name": f"{r['away']} @ {r['home']}", "time": tm, "eid": r["event_id"],
             "name": r["name"], "team": r["team"], "opp": r["opp"], "pos": r["pos"], "posx": _posx(r["nhl_id"], r["pos"]), "chg": r["team_changed"],
             "gg5": _gg_hist(r["nhl_id"]) if hist else None,
+            "l10": _last10(r["nhl_id"]) if hist else None,
             "p": round(r["p"] * 100, 1), "pm": round(r["p_mkt"] * 100, 1) if r["p_mkt"] else None,
             "pp": r["pp_unit"], "ev": ev, "edge": edge, "line": line, "sk": sk,
             "tm": {"score": round(_TM[r["team"]]["score"], 1)} if r["team"] in _TM else None,

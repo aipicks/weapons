@@ -107,6 +107,7 @@ h1 span{color:var(--accent)}
 .filters select,.filters input{font:500 13px var(--body);background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
 .filters input{flex:1 1 130px}
 .spmk{margin:8px 0}.spmk h4{margin:0 0 4px;font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.06em}.sprow{margin:4px 0;font-size:13px}.spb{position:relative;height:16px;background:var(--line);border-radius:3px;margin:2px 0;overflow:hidden}.spb i{position:absolute;left:0;top:0;bottom:0;background:var(--warn-bar);opacity:.55}.spb.mon i{background:var(--good);opacity:.5}.spb span{position:relative;z-index:1;font:11px var(--mono);padding-left:6px;line-height:16px}
+.l10{margin:6px 0;border:1px solid var(--line);border-radius:6px}.l10 summary{cursor:pointer;padding:6px 10px;font-size:13px}.l10w{display:flex;gap:4px;align-items:flex-end;padding:8px 10px 2px;overflow-x:auto}.l10c{flex:1;min-width:34px;text-align:center}.l10c small{display:block;font:10px var(--mono);color:var(--muted);margin-top:3px;line-height:1.2}.l10bar{background:var(--line);border-radius:3px 3px 0 0;font:700 13px var(--mono);display:flex;align-items:flex-start;justify-content:center;padding-top:2px;color:#fff}.l10bar.hit{background:var(--good,#2f9e6f)}.l10n{font:10px var(--mono);color:var(--muted);padding:0 10px 6px}
 .gk{margin:6px 0}.gk .sub,.glog{font:11px var(--mono);color:var(--muted)}.glog{margin:2px 0 4px 8px}.gk .bk{margin:4px 0 0 8px;padding-left:8px;border-left:2px solid var(--line)}
 .gpanel{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 .gpanel summary{cursor:pointer;padding:9px 12px;font:600 15px var(--display);letter-spacing:.05em;text-transform:uppercase}
@@ -225,6 +226,11 @@ const tmBadge = t => { if (!t) return '';
   return `<span class="tmx ${c}" title="Team matchup score, 1 to 4 (4 = best): opposing goalie + team offence + opposing defence">TEAM<b>${t.score.toFixed(1)}</b>of 4</span>`; };
 const xgCol = v => { const c = D.xgcuts; return !c ? 'c-gray' : v < c[0] ? 'c-red' : v >= c[1] ? 'c-green' : 'c-gray'; };
 const tgS = (t, tag) => t ? `${tag} <span class="${col(t.c)}"><b>${t.gpg}</b>/G (#${t.rank} of ${t.n}, ${t.gp} GP)</span> ${'·'} expected ${t.xgpg}/G` : `${tag} N/A`;
+function l10Box(L){
+  const g = L.reduce((a,x)=>a+x.g,0), gg = L.filter(x=>x.g>0).length, mx = Math.max(1, ...L.map(x=>x.g));
+  const cols = L.slice().reverse().map(x => `<div class="l10c" title="${x.d} ${x.ha} ${x.opp}: ${x.g} G, ${x.a} A, ${x.s==null?'?':x.s} SOG"><div class="l10bar${x.g>0?' hit':''}" style="height:${x.g>0?Math.max(18, x.g/mx*60):4}px">${x.g>0?x.g:''}</div><small>${x.ha==='@'?'@':''}${x.opp}<br>${x.d.replace('-','/')}</small></div>`).join('');
+  return `<details class="l10"><summary>Last ${L.length} games: <b>${g}</b> goal${g===1?'':'s'}, scored in <b>${gg}/${L.length}</b> (${Math.round(gg/L.length*100)}%)</summary><div class="l10w">${cols}</div><div class="l10n">oldest to newest, green = scored</div></details>`;
+}
 function row(r){
   const [ppt, ppc] = PP[r.pp];
   const g = r.goalie ? GL[r.goalie.status] : ['G: Unconfirmed','bad'];
@@ -253,6 +259,7 @@ function row(r){
     <div class="detail">
       <div class="ln"><span class="lab">25–26</span><span class="v">${s25}</span></div>
       <div class="ln"><span class="lab">26–27</span><span class="v">${s26}</span></div>
+      ${view==='tim' && r.l10 && r.l10.length ? l10Box(r.l10) : ''}
       ${view==='tim' && r.gg5 ? (r.gg5.nhl.length ? `<div class="ln"><span class="lab">Past ${r.gg5.nhl.length===1?'season':r.gg5.nhl.length+' seasons'}</span><span class="v">NHL goal-game %: ${r.gg5.nhl.map(x => `${x.s} <b>${x.pct}%</b> <small>(${x.gg}/${x.gp})</small>`).join(` ${sp} `)}</span></div>` : `<div class="ln"><span class="lab">Rookie</span><span class="v">No previous NHL seasons. ${r.gg5.pre && r.gg5.pre.length ? r.gg5.pre.map(x => `${x.s} ${x.lg}: <b>${x.g}</b> G in <b>${x.gp}</b> GP`).join(` ${sp} `) : 'No earlier pro or junior stats found.'}</span></div>`) : ''}
       ${view==='tim' && r.tg ? `<div class="ln"><span class="lab">Team goals</span><span class="v">${r.team} goals scored per game: ${tgS(r.tg.c,'26–27')}</span></div>` : ''}
       ${r.ppg ? `<div class="ln"><span class="lab">PP goals</span><span class="v">${ppgS(r.ppg.p,'25–26')} ${sp} ${ppgS(r.ppg.c,'26–27')}</span></div>` : ''}
