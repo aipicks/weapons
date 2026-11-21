@@ -108,6 +108,7 @@ h1 span{color:var(--accent)}
 .filters input{flex:1 1 130px}
 .spmk{margin:8px 0}.spmk h4{margin:0 0 4px;font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.06em}.sprow{margin:4px 0;font-size:13px}.spb{position:relative;height:16px;background:var(--line);border-radius:3px;margin:2px 0;overflow:hidden}.spb i{position:absolute;left:0;top:0;bottom:0;background:var(--warn-bar);opacity:.55}.spb.mon i{background:var(--good);opacity:.5}.spb span{position:relative;z-index:1;font:11px var(--mono);padding-left:6px;line-height:16px}
 .l10{margin:6px 0;border:1px solid var(--line);border-radius:6px}.l10 summary{cursor:pointer;padding:6px 10px;font-size:13px}.l10w{display:flex;gap:4px;align-items:flex-end;padding:8px 10px 2px;overflow-x:auto}.l10c{flex:1;min-width:34px;text-align:center}.l10c small{display:block;font:10px var(--mono);color:var(--muted);margin-top:3px;line-height:1.2}.l10bar{background:var(--line);border-radius:3px 3px 0 0;font:700 13px var(--mono);display:flex;align-items:flex-start;justify-content:center;padding-top:2px;color:#fff}.l10bar.hit{background:var(--good,#2f9e6f)}.l10n{font:10px var(--mono);color:var(--muted);padding:0 10px 6px}
+.tl2{padding:6px 10px 8px}.tlc{margin:6px 0}.tlc small{color:var(--muted);font:11px var(--mono)}.tlr{display:grid;grid-template-columns:34px 78px 56px 1fr;gap:6px;align-items:center;font-size:12px;padding:2px 0;border-top:1px solid var(--line)}.tlg{text-align:center;border-radius:4px;padding:1px 0;font:700 11px var(--mono);color:#fff}.tld,.tls{font:12px var(--mono)}.tlk small{color:var(--muted);font:11px var(--mono)}.tlg.w{background:var(--good,#2f9e6f)}.tlg.l{background:#c0463c}.tlg.o{background:#c08a1f}
 .gk{margin:6px 0}.gk .sub,.glog{font:11px var(--mono);color:var(--muted)}.glog{margin:2px 0 4px 8px}.gk .bk{margin:4px 0 0 8px;padding-left:8px;border-left:2px solid var(--line)}
 .gpanel{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 .gpanel summary{cursor:pointer;padding:9px 12px;font:600 15px var(--display);letter-spacing:.05em;text-transform:uppercase}
@@ -310,6 +311,8 @@ const evs = v => (v>0?'+':'')+v.toFixed(1)+'%';
 const rkb = (t,k) => { const r = t.rk && t.rk[k]; if (!r) return ''; const c = r[0] <= r[1]/3 ? 'c-green' : r[0] > 2*r[1]/3 ? 'c-red' : 'c-gray'; return ` <span class="${c}">#${r[0]}</span>`; };
 const stat = (b,d=1,suf='') => b==null?'?':b.toFixed(d)+suf;
 const BOOKSHORT = b => b.replace('espnbet','ESPN').replace('draftkings','DK').replace('fanduel','FD').replace('betmgm','MGM').replace('bovada','Bov').replace('caesars','CZR').replace('caesars','CZR');
+const rec = L => { if (!L || !L.length) return 'n/a'; const w = L.filter(x=>x.r==='W').length, o = L.filter(x=>x.r==='OTL').length; return `${w}-${L.length-w-o}-${o}`; };
+const tlog = (tm, L) => !L || !L.length ? `<div class="tlc"><b>${tm}</b><div class="glog">no games yet</div></div>` : `<div class="tlc"><b>${tm}</b> <small>${rec(L)} (W-L-OTL), newest first</small>${L.map(x=>`<div class="tlr"><span class="tlg ${x.r==='W'?'w':x.r==='L'?'l':'o'}">${x.r}</span><span class="tld">${x.d.replace('-','/')} ${x.ha==='@'?'@':'vs'} ${x.opp}</span><span class="tls">${x.gf}-${x.ga}${x.x?' '+x.x:''}</span><span class="tlk">${x.gk?`G: <b>${esc(x.gk.n)}</b> <small>${x.gk.sa==null?'':(x.gk.sa-x.gk.ga)+'/'+x.gk.sa+' SV, '}${x.gk.ga} GA${x.gk.pulled?', pulled':''}</small>`:'G: ?'}</span></div>`).join('')}</div>`;
 function gcard(g){
   const m = g.ml, t = g.total, sp = '<span class="sep">|</span>';
   const gseas = x => x ? `${x.gaa.toFixed(2)} GAA ${rk(x.gr, x.gc)} ${'·'} ${String(x.sv.toFixed(3)).replace(/^0/,'')} SV% ${rk(x.svr, x.svc)} ${'·'} ${x.gp} GP${x.starts!=null?' / '+x.starts+' GS':''}` : 'no games this season';
@@ -336,6 +339,7 @@ function gcard(g){
       ${row('Power play %', stat(a.pp_c,1,'%')+rkb(a,'pp_c'), stat(h.pp_c,1,'%')+rkb(h,'pp_c'))}
       ${row('Penalty kill %', stat(a.pk_c,1,'%')+rkb(a,'pk_c'), stat(h.pk_c,1,'%')+rkb(h,'pk_c'))}
     </table>
+    <details class="l10"><summary>Last 10 games: ${g.away} <b>${rec(g.tlog.away)}</b> ${'·'} ${g.home} <b>${rec(g.tlog.home)}</b></summary><div class="tl2">${tlog(g.away, g.tlog.away)}${tlog(g.home, g.tlog.home)}</div></details>
     <div class="lines">${g.books.map(b=>`${BOOKSHORT(b.b)}: ML ${b.ma||'?'}/${b.mh||'?'} · ${b.t??'?'} (O ${b.o||'?'}/U ${b.u||'?'})`).join('<br>')}</div>
   </article>`;
 }

@@ -490,6 +490,42 @@ def _sog_payload(con, date, eids=None):
     return out
 
 
+_TEAM_LOGS = {}
+
+
+def _team_log(team, n=10):
+    """A team's last n completed regular-season games (newest first): date, opponent, home/away, score, W / L / OTL."""
+    if team in _TEAM_LOGS:
+        return _TEAM_LOGS[team]
+    from ..sources import nhl_api
+    out = []
+    try:
+        j = nhl_api.get(f"{nhl_api.WEB}/club-schedule-season/{team}/{CUR_SEASON}", f"sched_{CUR_SEASON}/{team}", force=True)
+        done = [g for g in (j or {}).get("games", []) if g.get("gameType") == 2 and g.get("gameState") in ("OFF", "FINAL")]
+        for g in reversed(done[-n:]):
+            home = g["homeTeam"]["abbrev"] == team
+            me, opp = (g["homeTeam"], g["awayTeam"]) if home else (g["awayTeam"], g["homeTeam"])
+            ext = (g.get("gameOutcome") or {}).get("lastPeriodType", "REG")
+            won = me.get("score", 0) > opp.get("score", 0)
+            res = "W" if won else ("OTL" if ext in ("OT", "SO") else "L")
+            gk = None
+            try:
+                box = nhl_api.get(f"{nhl_api.WEB}/gamecenter/{g['id']}/boxscore", f"box/{g['id']}")
+                goalies = box["playerByGameStats"]["homeTeam" if home else "awayTeam"].get("goalies", [])
+                st = next((x for x in goalies if x.get("starter")), goalies[0] if goalies else None)
+                if st:
+                    gk = {"n": (st["name"]["default"] or "").split(". ", 1)[-1], "sa": st.get("shotsAgainst"), "ga": st.get("goalsAgainst"),
+                          "pulled": any(x is not st and (x.get("shotsAgainst") or 0) > 0 for x in goalies)}
+            except Exception:
+                gk = None
+            out.append({"d": g["gameDate"][5:], "opp": opp["abbrev"], "ha": "vs" if home else "@", "gf": me.get("score"), "ga": opp.get("score"),
+                        "r": res, "x": ext if ext in ("OT", "SO") else "", "gk": gk})
+    except Exception:
+        out = []
+    _TEAM_LOGS[team] = out
+    return out
+
+
 def _goalie_log(gid, n=5):
     """Last n regular-season starts/appearances (newest first) from the NHL game log, [] if unknown."""
     if not gid:
@@ -556,6 +592,7 @@ def _games_payload(con, date, eids=None):
                        "u": fmt_american(b["under"]) if b["under"] is not None else None} for b in g["books"]],
             "st": {k: {kk: (f1(vv, 2) if kk not in ("gp_c", "rk") else vv) for kk, vv in v.items()} for k, v in g["stats"].items()},
             "parts": {"h": {k: f1(v, 2) for k, v in g["h"].items()}, "a": {k: f1(v, 2) for k, v in g["a"].items()}},
+            "tlog": {"home": _team_log(g["home"]), "away": _team_log(g["away"])},
         })
     return out
 
