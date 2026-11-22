@@ -18,18 +18,21 @@ LOGS = ROOT / "logs"
 LOGS.mkdir(exist_ok=True)
 LOG = LOGS / f"auto-{datetime.date.today().isoformat()}.log"
 LOCK = ROOT / "data" / "auto_run.lock"
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)  # no console flashes, nothing to Ctrl+C
 
 
 def log(msg):
     line = f"[{datetime.datetime.now():%H:%M:%S}] {msg}"
-    print(line)
+    if sys.stdout:
+        print(line)
     with open(LOG, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
 
 def run(*cmd, timeout=1500):
     log("$ " + " ".join(cmd))
-    p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
+    p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                       stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
     tail = (p.stdout + p.stderr).strip().splitlines()[-6:]
     for t in tail:
         log("   " + t)
@@ -37,12 +40,13 @@ def run(*cmd, timeout=1500):
 
 
 def main():
+    log("run started")
     if LOCK.exists() and time.time() - LOCK.stat().st_mtime < 3600:
         log("another run is in progress (lock file < 1h old); exiting")
         return 1
     LOCK.write_text(str(os.getpid()))
     try:
-        py = sys.executable
+        py = sys.executable.replace("pythonw.exe", "python.exe")
         if run(py, "-m", "nhl_tim.cli", "update_daily") != 0:
             log("update_daily failed; stopping")
             return 2
@@ -63,7 +67,7 @@ def main():
             log("tests failed; not publishing")
             return 5
         run("git", "add", "-A")
-        if subprocess.run(["git", "diff", "--cached", "--quiet"]).returncode == 0:
+        if subprocess.run(["git", "diff", "--cached", "--quiet"], creationflags=NO_WINDOW, stdin=subprocess.DEVNULL).returncode == 0:
             log("nothing changed; done")
             return 0
         run("git", "commit", "-q", "-m", f"Auto board update {datetime.datetime.now():%Y-%m-%d %H:%M}")
