@@ -57,8 +57,20 @@ def snapshot(con, date):
     from .parlays import build_parlays
     import datetime as _dt
     _now = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M")
-    con.execute("DELETE FROM pred_log WHERE date=? AND kind='parlay_leg' AND settled=0 AND start>?", (date, _now))  # drop stale picks
+    # Several refreshes a day: a parlay is replaced only while NONE of its legs has started or settled. A parlay with any started
+    # leg stays whole (all its legs, so it can still be graded), and new parlays are numbered after the highest kept number.
+    groups = {}
+    for r in con.execute("SELECT key, settled, start, extra FROM pred_log WHERE date=? AND kind='parlay_leg'", (date,)):
+        groups.setdefault(json.loads(r["extra"] or "{}").get("parlay"), []).append(r)
+    kept_max = 0
+    for num, legs in groups.items():
+        if all(l["settled"] == 0 and l["start"] > _now for l in legs):
+            for l in legs:
+                con.execute("DELETE FROM pred_log WHERE date=? AND kind='parlay_leg' AND key=?", (date, l["key"]))
+        elif isinstance(num, int):
+            kept_max = max(kept_max, num)
     for par in build_parlays(con, date)["parlays"]:
+        par = dict(par, n=par["n"] + kept_max)
         for leg in par["legs"]:
             _put(con, date, "parlay_leg", f"{leg['pid']}:{par['n']}", leg["start"], name=leg["name"], team=leg["team"],
                  opp=leg["opp"], game=leg["game"], side=leg["side"], line=leg["line"], price=leg["price"], book=leg["book"],
