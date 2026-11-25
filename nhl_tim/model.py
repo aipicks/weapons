@@ -224,7 +224,7 @@ def build_rows(con, date, all_players=False):
 
         if cons is not None:
             p_mkt = cons
-            pm = sigmoid(W["market_weight"] * logit(p_mkt) + (1 - W["market_weight"]) * z_fund)
+            pm = sigmoid(W.get("calib_b", 1.0) * (W["market_weight"] * logit(p_mkt) + (1 - W["market_weight"]) * z_fund))
         else:
             p_mkt, pm = None, p_fund
 

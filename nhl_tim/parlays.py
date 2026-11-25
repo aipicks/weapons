@@ -28,7 +28,7 @@ def american(d):
 
 
 def _count(n_games):
-    return 8  # up to 8 parlays, best EV first
+    return 2  # 2026-11-25: at most 2 a day (196 parlays went -25u; the first of each day was about break-even)
 
 
 def _why(r, side, ln, p, hit, opp_goalie, n_books=2):

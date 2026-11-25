@@ -15,7 +15,9 @@ POOLS_CSV = DATA / "pools.csv"  # columns: pool,player[,team]  (pool = 1|2|3)
 
 # Transparent baseline priors (NOT fitted). Replace via backtest/logistic regression later.
 W = {
-    "market_weight": 0.50,     # logit-blend weight on market (vig-adjusted consensus) when available; 0.5 = model and market equal
+    "market_weight": 0.90,     # logit-blend weight on market. Was 0.5; 12,670 graded goal picks (Oct-Nov 2026) showed the model over-projects
+                               # scorers (model 21.5% vs actual 16.8%; at model 54% actual 34%) and market-only scored best. Refit 2026-11-25.
+    "calib_b": 1.10,           # logit slope applied after the blend (fitted on Oct, checked on Nov: mean 16.9% vs actual 16.7%)
     "vig_factor": 0.94,        # fallback vig strip when a book has no No-side price (otherwise Yes/No devig)
     "league_goal_game": 0.21,  # per-skater-game scoring rate prior
     "prior_games": 25,         # shrink prev-season goal-game rate toward league

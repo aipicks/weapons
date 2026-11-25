@@ -1,4 +1,4 @@
-<title>Tims Pick Board</title>
+<title>NHL Pick Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -196,8 +196,8 @@ const D = /*__DATA__*/null;
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pools = [...new Set(D.rows.map(r => r.pool))].sort();
-let view = 'tim', pool = pools[0], grouped = false, limit = 40, sortev = false, evonly = false;
-try { const s = JSON.parse(localStorage.getItem('pb')||'{}'); if (pools.includes(s.pool)) pool = s.pool; grouped = !!s.grouped; if (['all','tim','sog','parlays','rankings','lineups','games','results'].includes(s.view)) view = s.view; } catch(e){}
+let view = D.mode === 'tims' ? 'tim' : 'sog', pool = pools[0], grouped = false, limit = 40, sortev = false, evonly = false;
+try { const s = JSON.parse(localStorage.getItem('pb')||'{}'); if (pools.includes(s.pool)) pool = s.pool; grouped = !!s.grouped; if ((D.mode === 'tims' ? ['tim'] : ['all','sog','parlays','rankings','lineups','games','splits','results','how']).includes(s.view)) view = s.view; } catch(e){}
 const save = () => { try { localStorage.setItem('pb', JSON.stringify({pool, grouped, view})); } catch(e){} };
 
 let sortKey = 'default', sortAsc = false;
@@ -205,7 +205,8 @@ const LINE_LABEL = {F1:'Line 1',F2:'Line 2',F3:'Line 3',F4:'Line 4',D1:'Pair 1',
 const lineTag = c => `<span class="tag pptag">${c ? LINE_LABEL[c] : 'No line'}</span>`;  // neutral gray: line is context, not a rating
 const sp0 = '<span class="sep">|</span>';
 const label = p => p ? 'Pick #'+p : 'All priced';
-const VIEWS = {tim:'Tim Hortons NHL Challenge', all:'+EV GOAL SCORERS', sog:'Shots on Goal', parlays:'Shots Parlays', rankings:'Rankings', lineups:'Lineups', games:'Game Bets', splits:'Betting Splits', results:'Results'};
+const VIEWS = D.mode === 'tims' ? {tim:'Tim Hortons NHL Challenge'}
+  : {sog:'Shots on Goal', all:'Goal Scorers', parlays:'Shots Parlays', games:'Game Bets', rankings:'Team Stats', lineups:'Lineups', splits:'Betting Splits', results:'Results', how:'How it works'};
 const col = c => c ? `c-${c}` : 'c-gray';
 const rk = (v, c) => v ? `<span class="${col(c)}">#${v}</span>` : '<span class="c-na">unranked</span>';
 const PP = {1:['PP1 ✅','good'], 2:['PP2 ✔','warn'], 0:['NO PP UNIT','bad']};
@@ -448,7 +449,7 @@ function renderGames(){
     : '<div class="gtop"><h3>Best bets today</h3><div class="gp">No game clears the +1% EV bar today.</div></div>';
   const bv = D.safe;
   const sf = bv ? `<div class="gtop safe ${lab(bv.label)}"><h3>${bv.label==='BET' ? 'Best value of the day' : bv.label==='LEAN' ? 'Best value of the day (small edge)' : 'No bet clears +3% EV: best available value'}</h3><div class="gp"><b>${esc(bv.game)}</b> ${bv.market}: <b>${esc(bv.sel)} ${bv.price}</b> <small>${BOOKSHORT(bv.book)}</small><br>our <b>${bv.p}%</b> vs market ${bv.mkt}% <span class="sep">|</span> EV <b>${evs(bv.ev)}</b> <span class="tag ${lab(bv.label)}">${bv.label}</span></div><small class="hint">Highest expected value across every moneyline and total at the five books, however likely it is to win. Under +3% EV is not a real edge; treat it as a pass or a very small play.</small></div>` : '';
-  $('#gamesbox').innerHTML = top + sf + D.games.map(gcard).join('') + document.getElementById('howgames').innerHTML;
+  $('#gamesbox').innerHTML = top + sf + D.games.map(gcard).join('');  // model notes moved to the How it works tab
   $('#count').textContent = D.games.length + ' games';
   $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
 }
@@ -458,7 +459,10 @@ function renderResults(){
   $('#list').hidden = true; $('#gamesbox').hidden = false;
   $('#tabs').hidden = true; $('#filters').hidden = true; $('#by').hidden = true;
   const R = D.results || {};
-  const head = `<div class="gtop"><h3>Season tracking</h3><div class="gp">Every prediction is logged before the games and settled afterwards from the NHL results. <b>${R.days_settled||0}</b> day(s) settled${R.since?' since '+R.since:''} · ${R.pending||0} predictions waiting for games to finish.</div></div>`;
+  const H = D.card_hist, uu = v => (v > 0 ? '+' : '') + v.toFixed(2), rr = v => v == null ? '-' : (v * 100).toFixed(1) + '%';
+  const cardHist = !H ? '' : `<div class="gtop"><h3>Short-list record</h3><div class="gp">Only the short list counts here: every past day was re-graded as if today's rules had been used (3 likeliest goal scorers, shots at +4% EV one per game up to 5, the first 2 parlays, game bets at +3% EV up to 2), choosing only from what was logged before puck drop and grading at the logged price, 1 unit each. About <b>${H.per_day}</b> picks a day over ${H.days} days: <b>${H.total.w}-${H.total.l}, ${uu(H.total.units)} units (${rr(H.total.roi)} per pick)</b>.</div>
+    <table class="rk"><thead><tr><th></th><th>Picks</th><th>W-L</th><th>Units</th><th>ROI</th></tr></thead><tbody>${Object.entries(H.by_kind).filter(([k, x]) => x.n).map(([k, x]) => `<tr><td>${k}</td><td>${x.n}</td><td>${x.w}-${x.l}</td><td><span class="rk-c ${x.units > 0 ? 'g' : x.units < 0 ? 'r' : 'n'}">${uu(x.units)}</span></td><td>${rr(x.roi)}</td></tr>`).join('')}</tbody></table></div>`;
+  const head = cardHist + `<details class="gpanel"><summary>Every prediction ever logged<small>the long list, not what we would play</small></summary><div class="gtop"><h3>Season tracking</h3><div class="gp">Every prediction is logged before the games and settled afterwards from the NHL results. <b>${R.days_settled||0}</b> day(s) settled${R.since?' since '+R.since:''} · ${R.pending||0} predictions waiting for games to finish.</div></div>`;
   if (!R.days_settled) { $('#gamesbox').innerHTML = head + '<div class="gtop"><div class="gp">No settled results yet. The first day appears after its games finish (run the daily update the next morning).</div></div>'; finishResults(); return; }
   const g = R.goal, br = (a,b) => a==null||b==null ? '' : (a < b ? ' <span class="tag good">model better</span>' : ' <span class="tag bad">market better</span>');
   const calib = g.calib.map(c => `<tr><td>${c.range}</td><td>${c.n}</td><td>${c.pred}%</td><td>${c.actual}%</td></tr>`).join('');
@@ -477,8 +481,7 @@ function renderResults(){
       ${bet('Moneyline, all best', R.ml.all)}${bet('Moneyline, BET+LEAN', R.ml.bet)}${bet('Puck line, all best', R.spread.all)}${bet('Puck line, BET+LEAN', R.spread.bet)}${bet('Total, all best', R.total.all)}${bet('Total, BET+LEAN', R.total.bet)}${bet('Best value pick', R.best_value)}</table>
     <div class="gg2">Home-win Brier (${R.ml_brier.n} games): raw model <b>${num(R.ml_brier.model_raw)}</b> · 50/50 blend <b>${num(R.ml_brier.blend)}</b> · market <b>${num(R.ml_brier.market)}</b></div></div>
   <div class="gcard"><div class="ghead"><b>Shots on goal</b></div>
-    <div class="gg2">${R.sog.n} lines · best side hit ${R.sog.hit==null?'?':R.sog.hit+'%'} vs our ${R.sog.avg_p==null?'?':R.sog.avg_p+'%'} · $1 on every best side ${money(R.sog.profit_all)} · only +EV sides (${R.sog.pos_n}) ${money(R.sog.pos_profit)}</div></div>
-  <p class="how">Small samples swing wildly; judge the model after hundreds of picks, not days. The goal of this page is to show whether our probability beats the market's (lower Brier score) and whether the +EV picks actually make money.</p>`;
+    <div class="gg2">${R.sog.n} lines · best side hit ${R.sog.hit==null?'?':R.sog.hit+'%'} vs our ${R.sog.avg_p==null?'?':R.sog.avg_p+'%'} · $1 on every best side ${money(R.sog.profit_all)} · only +EV sides (${R.sog.pos_n}) ${money(R.sog.pos_profit)}</div></div>`;
   finishResults();
 }
 function finishResults(){
@@ -514,6 +517,23 @@ function matchupTable(){
   const rowsH = M.map(m => `<tr><td><span class="tag ${sc(m.score)} pptag"><b>${m.score.toFixed(1)}</b></span></td><td><b>${m.team}</b> ${m.home?'vs':'@'} ${m.opp}</td><td>${esc(m.goalie||'?')} <small>(${st[m.status]||'?'}, ${m.gf>0?'+':''}${m.gf}% goals vs xG)</small> <b>${m.p_goalie}%</b></td><td>${m.off==null?'?':m.off} xGF/G <b>${m.p_off}%</b></td><td>${m.opp} rank ${m.def} <b>${m.p_def}%</b></td></tr>`).join('');
   return `<div class="gtop"><h3>Team matchup score</h3><p class="note">Each team gets a score from 1 to 4 (4 = best spot for its skaters), judged against the whole league, not against today's other games. It averages three percentages: how weak the opposing goalie is, how strong the team's own offence is, and how weak the opposing defence is (current defence, last season and preseason). Each pool below is sorted by this score.</p><table class="mt"><tr><th>Score</th><th>Team</th><th>Opposing goalie (weakness percentile)</th><th>Team offence (percentile)</th><th>Opposing defence (weakness percentile)</th></tr>${rowsH}</table></div>`;
 }
+function renderHow(){
+  $('#list').hidden = true; $('#gamesbox').hidden = false;
+  $('#tabs').hidden = true; $('#filters').hidden = true; $('#by').hidden = true;
+  const sec = (t, b) => `<div class="gcard"><div class="ghead">${t}</div><div class="gg2" style="line-height:1.6">${b}</div></div>`;
+  $('#gamesbox').innerHTML =
+    sec('How this board works', `<p>This board turns public NHL data and live sportsbook prices into a short list of picks each day. Every pick comes from fixed rules that run the same way every day, is saved before puck drop, and is graded from the final box score at the price shown.</p>
+      <p><b>Please read this first:</b> these are research picks tracked with paper money (1 unit each), not betting advice. Hockey prop and game markets are sharp, and most of our tests show the market is hard to beat. Treat every pick as an informed opinion, not a sure thing. Only games starting 6 PM ET or later are shown.</p>`)
+  + sec('Goal scorers', `<p>Each player's chance to score starts from the sportsbooks' anytime-goal prices (with the bookmaker's margin removed), adjusted slightly by our own model: goal rate this season and last, power-play unit and time, ice time, shots, his team's expected goals, the opposing defence and the opposing goalie.</p>
+      <p>We checked 12,670 graded predictions: players scored 16.8% of the time, while our model alone said 21.5%, and the gap was worst for the top names (players the model gave 54% actually scored 34%). The market alone was more accurate than any mix with our model. So the final chance is now <b>90% market, 10% model</b>, with a small correction fitted on October and checked on November (predicted 16.9% vs actual 16.7%).</p>
+      <p>The tab shows only the <b>3 likeliest scorers</b> on the slate. Ranking by "value" instead picked long shots that scored 6% of the time. Even the likeliest scorers have only roughly broken even against the price so far, so this is a list of likely scorers, not a proven edge.</p>`)
+  + sec('Shots on goal', `<p>For each player with a shots line we project his shots: recent form and season rate (this season and last, with low-sample players pulled toward their position average), ice time, power-play time, a shot-attempt projection (attempts per game times how often his attempts reach the net), the opponent's shots and attempts allowed to his position, blocks, and game pace. That gives a chance for the over and the under at the line, blended 50/50 with the market's chance, and the side with the better value is shown.</p>
+      <p>The tab shows at most <b>5 picks a day, one per game, each at +4% expected value or better</b> at the best price across FanDuel, DraftKings, BetMGM and Caesars. In our history, everything at +2% gave about 21 picks a day and roughly broke even; the tighter rule did a little better (+1.3% per pick), which is still a small, noisy edge.</p>`)
+  + sec('Shots parlays', `<p>Two-leg parlays built from main and alternate shots lines at one sportsbook: legs are 2+ shot overs or unders on 1.5, 2.5 or 3.5 shots, priced about -350 to -160, hit in at least 3 of the player's last 5 games and at 55%+ by our model, from two different games, with a combined price between -125 and +110. At most <b>2 a day</b>, most likely to hit first. Across 196 past parlays they lost money (-25 units); the first parlay of each day was about break-even, so treat these as entertainment-sized picks.</p>`)
+  + sec('Game bets (moneyline, puck line, totals)', document.getElementById('howgames').innerHTML.replace(/<\/?details[^>]*>|<summary>.*?<\/summary>/g, ''))
+  + sec('Team stats, lineups and goalies', `<p><b>Team stats</b> ranks every team on goals, expected goals (MoneyPuck), shots and attempts for and against, blocks, power play and penalty kill. <b>Lineups</b> and power-play units come from Daily Faceoff and refresh on every daily run. <b>Starting goalies</b> come from Daily Faceoff only; "Unconfirmed" means the team has not confirmed its starter yet. Player and team stats come from the NHL's own stats service.</p>`)
+  + sec('Results', `<p>Every pick shown is saved before puck drop and graded at the logged price. Small samples swing wildly: judge the board after hundreds of picks, not a few days. The point of the Results tab is to show honestly whether our probabilities beat the market's and whether the picks make money.</p>`);
+}
 function render(){
   if (view === 'games') return renderGames();
   if (view === 'splits') return renderSplits();
@@ -521,6 +541,7 @@ function render(){
   if (view === 'rankings') return renderRankings();
   if (view === 'lineups') return renderLineups();
   if (view === 'results') return renderResults();
+  if (view === 'how') return renderHow();
   $('#gamesbox').hidden = true; $('#list').hidden = false;
   const all = view !== 'tim';
   const rf = view === 'sog' ? sogRow : row;
@@ -541,7 +562,7 @@ function render(){
     if (all && sorted.length > shown.length) html += `<button class="more" id="more">Show ${Math.min(40, sorted.length-shown.length)} more (${sorted.length-shown.length} left)</button>`;
   }
   $('#list').innerHTML = (view === 'tim' && sortKey === 'tm' ? matchupTable() : '') + html;
-  $('#count').textContent = rows.length + (view === 'sog' ? ' players with a shots line' : ' players') + (view==='all' ? ' · top 30 by EV (model probability 15%+) across the whole slate' : view==='sog' ? ' · best side of every player shots line, ranked by EV' : '');
+  $('#count').textContent = rows.length + (view === 'sog' ? ' players with a shots line' : ' players') + (view==='all' ? ' · the 3 likeliest scorers on the slate (no proven edge)' : view==='sog' ? ' · top 5 a day, one per game, +4% EV or better' : '');
   $('#views').innerHTML = Object.entries(VIEWS).map(([k,v]) => `<button class="tab" role="tab" aria-selected="${k===view}" data-v="${k}">${v}</button>`).join('');
   $('#tabs').hidden = view !== 'tim';
   $('#tabs').innerHTML = pools.map(p => `<button class="tab" role="tab" aria-selected="${p===pool}" data-p="${p}">${label(p)}</button>`).join('');
@@ -570,6 +591,8 @@ for (const id of ['f-q','f-team','f-game','f-pos','f-pp','f-line','f-side']) $('
 $('#by').onclick = () => { grouped = !grouped; save(); render(); };
 $('#evonly').onclick = () => { evonly = !evonly; limit = 40; render(); };
 fillFilters();
+if (D.mode !== 'tims') { const lg = document.querySelector('.legend'); if (lg) lg.hidden = true; }
+else { document.title = 'Tim Hortons Picks'; const h = document.querySelector('h1'); if (h) h.innerHTML = 'Tim Hortons <span>Picks</span>'; setTimeout(() => { const n = document.getElementById('views'); if (n) n.setAttribute('data-brand', 'Tim Hortons Picks'); }, 0); }
 (function(){
   const st = s => `<span class="tag ${STC[s]||'bad'}">${s}</span>`;
   const stat = (x, tag) => x ? `${tag} ${x.gaa.toFixed(2)} GAA ${rk(x.gr, x.gc)} ${String(x.sv.toFixed(3)).replace(/^0/,'')} SV% ${rk(x.svr, x.svc)} ${x.gp} GP` : `${tag} N/A`;
@@ -581,3 +604,160 @@ const dt = new Date(D.date + 'T12:00:00');
 $('#sub').textContent = dt.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}) + ' · odds ' + (D.meta.daily_updated||'?').slice(11,16) + ' UTC · PP units ' + (D.meta.last_pp_update||'?').slice(0,10);
 render();
 </script>
+<!-- theme:start -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* ===== Shared board theme (NBA / NFL / NHL). Deliberately dark-only: deep teal-black ground, turquoise accent, glass cards.
+   Source of truth: DAILY BOARDS/_shared/. Injected into each board's template by _shared/apply_theme.py — edit here, then re-apply. ===== */
+:root:root:root {
+  --t-bg: #051317; --t-bg2: #0a1f26;
+  --t-glass: rgba(13, 36, 43, .66); --t-glass2: rgba(19, 49, 57, .74); --t-glass3: rgba(26, 64, 73, .8);
+  --t-line: rgba(94, 234, 212, .12); --t-line2: rgba(94, 234, 212, .32);
+  --t-fg: #e3f2f0; --t-muted: #84a2a4; --t-acc: #2dd4bf; --t-acc2: #5eead4; --t-acc-ink: #032a27; --t-glow: rgba(45, 212, 191, .26);
+  --t-good: #4ade80; --t-good-bg: rgba(34, 197, 94, .16); --t-bad: #fb7185; --t-bad-bg: rgba(244, 63, 94, .16);
+  --t-warn: #facc15; --t-warn-bg: rgba(234, 179, 8, .15); --t-mid: #a7bcbd; --t-mid-bg: rgba(148, 178, 180, .12);
+  --t-head: "Outfit", "Segoe UI", system-ui, sans-serif; --t-body: "Inter", "Segoe UI", system-ui, sans-serif; --t-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --t-r: 14px; --t-r2: 10px;
+  color-scheme: dark;
+}
+html { background: var(--t-bg); }
+body { background: var(--t-bg) !important; color: var(--t-fg); font-family: var(--t-body); isolation: isolate; -webkit-font-smoothing: antialiased; }
+#tbg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+body::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(900px 520px at 78% -8%, rgba(45, 212, 191, .13), transparent 60%), radial-gradient(700px 480px at -6% 104%, rgba(14, 165, 233, .08), transparent 60%); }
+::selection { background: rgba(45, 212, 191, .35); }
+* { scrollbar-color: rgba(94, 234, 212, .25) transparent; }
+
+/* glass surfaces and pills shared by every board */
+.t-glass { background: var(--t-glass); border: 1px solid var(--t-line); border-radius: var(--t-r);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 10px 30px rgba(0, 0, 0, .25); }
+.t-eyebrow { font: 600 11px var(--t-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--t-acc); }
+
+/* sidebar shell: each board's tab bar gets class t-nav and data-brand="..." from its own css; wide screens show it as a left rail */
+@media (min-width: 1100px) {
+  body.t-shell { padding-left: 272px !important; }
+  .t-nav { position: fixed !important; left: 0; top: 0; bottom: 0; width: 248px; margin: 0 !important; z-index: 20;
+    display: flex !important; flex-direction: column !important; gap: 3px !important; overflow-y: auto; overflow-x: hidden;
+    padding: calc(18px + env(safe-area-inset-top, 0px)) 14px 18px calc(14px + env(safe-area-inset-left, 0px)) !important;
+    background: rgba(6, 22, 27, .6); border: 0 !important; border-right: 1px solid var(--t-line) !important; border-radius: 0 !important;
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+  .t-nav::before { content: attr(data-brand); display: block; font: 800 21px/1.1 var(--t-head); letter-spacing: -.01em; color: var(--t-fg); padding: 4px 10px 16px; margin-bottom: 8px; border-bottom: 1px solid var(--t-line); }
+  .t-nav::after { content: "Paper trading \00B7  no guaranteed wins"; display: block; margin-top: auto; padding: 14px 10px 0; font: 500 11px var(--t-body); color: var(--t-muted); opacity: .8; }
+  .t-nav button, .t-nav .tab { width: 100%; text-align: left !important; justify-content: flex-start; border: 1px solid transparent !important; border-radius: var(--t-r2) !important;
+    padding: 9px 12px !important; margin: 0 !important; background: transparent !important; color: var(--t-muted) !important;
+    font: 500 14px var(--t-body) !important; letter-spacing: 0 !important; text-transform: none !important; display: flex; align-items: center; gap: 10px; }
+  .t-nav button::before, .t-nav .tab::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .45; flex: none; }
+  .t-nav button:hover, .t-nav .tab:hover { color: var(--t-fg) !important; background: rgba(94, 234, 212, .06) !important; }
+  .t-nav button[aria-selected="true"], .t-nav button.on, .t-nav .tab[aria-selected="true"], .t-nav .tab[aria-selected=true] {
+    color: var(--t-acc2) !important; background: rgba(45, 212, 191, .12) !important; border-color: var(--t-line2) !important; box-shadow: 0 0 18px var(--t-glow); }
+  .t-nav button[aria-selected="true"]::before, .t-nav button.on::before, .t-nav .tab[aria-selected="true"]::before { opacity: 1; box-shadow: 0 0 8px var(--t-acc); }
+}
+@media (max-width: 1099.98px) {
+  .t-nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; gap: 6px !important; overflow-x: auto; flex-wrap: nowrap !important;
+    padding: 8px 2px !important; margin-bottom: 12px !important; border: 0 !important; background: rgba(5, 19, 23, .86); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .t-nav button, .t-nav .tab { flex: none; border: 1px solid var(--t-line) !important; border-radius: 999px !important; padding: 7px 14px !important; background: var(--t-glass) !important;
+    color: var(--t-muted) !important; font: 500 13px var(--t-body) !important; letter-spacing: 0 !important; text-transform: none !important; white-space: nowrap; }
+  .t-nav button[aria-selected="true"], .t-nav button.on, .t-nav .tab[aria-selected="true"], .t-nav .tab[aria-selected=true] {
+    color: var(--t-acc-ink) !important; background: var(--t-acc) !important; border-color: var(--t-acc) !important; box-shadow: 0 0 16px var(--t-glow); }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* NHL board: map the board's own tokens onto the shared theme (its light default is replaced), then restyle its components. */
+:root:root:root {
+  --bg: var(--t-bg); --surface: #0c2228; --surface2: #12303a; --line: rgba(94, 234, 212, .13); --fg: var(--t-fg); --muted: var(--t-muted);
+  --accent: var(--t-acc); --accent-ink: var(--t-acc-ink);
+  --good: var(--t-good); --good-bg: var(--t-good-bg); --good-bar: #16a34a; --bad: var(--t-bad); --bad-bg: var(--t-bad-bg); --bad-bar: #e11d48;
+  --warn: var(--t-warn); --warn-bg: var(--t-warn-bg); --warn-bar: #ca8a04; --mid: var(--t-mid); --mid-bg: var(--t-mid-bg); --mid-bar: #5f7f82; --bar-bg: rgba(148, 178, 180, .14);
+  --display: var(--t-head); --body: var(--t-body); --mono: var(--t-mono);
+}
+.wrap { max-width: 1120px; }
+header { padding-block: 22px 12px; border-bottom: 1px solid var(--t-line); margin-bottom: 10px; }
+header::before { content: "NHL betting intelligence"; flex-basis: 100%; font: 600 11px var(--t-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--t-acc); }
+h1 { font: 800 40px/1.05 var(--t-head); letter-spacing: -.02em; text-transform: none; }
+h1 span { color: var(--t-acc2); text-shadow: 0 0 24px var(--t-glow); }
+.bar { background: rgba(5, 19, 23, .9); border-bottom-color: var(--t-line); }
+.row, .gcard, .gtop, .gpanel, .lu-sq, .l10, .pl-stats { background: var(--t-glass); border: 1px solid var(--t-line); border-radius: var(--t-r);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 10px 28px rgba(0, 0, 0, .22); }
+.row { margin-top: 8px; transition: border-color .2s, box-shadow .2s; }
+.row:hover, .gcard:hover { border-color: var(--t-line2); }
+.nm, .ghead, .gtop h3, .gpanel summary, .lu-sec, .game { font-family: var(--t-head); letter-spacing: -.005em; text-transform: none; }
+.nm { font-weight: 700; font-size: 18px; }
+.game { font: 600 12px var(--t-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--t-acc); border-bottom: 1px solid var(--t-line); padding: 22px 2px 8px; }
+.rk, .pct b, .tmx b { font-family: var(--t-head); font-weight: 800; }
+.pct { background: rgba(45, 212, 191, .07); border: 1px solid var(--t-line2); border-radius: var(--t-r2); padding: 6px 10px; }
+.tag, .rk-c, .c-red, .c-green, .c-gray, .c-na, .whyl li, .pct em.ev { border-radius: 999px; padding-inline: 8px; }
+.tmx { border-radius: var(--t-r2); }
+.bet { border-radius: var(--t-r2); }
+.tabs:not(.views) .tab, .chip { font: 500 13px var(--t-body); letter-spacing: 0; text-transform: none; border-radius: 999px; background: var(--t-glass); border-color: var(--t-line); color: var(--t-muted); }
+.tabs:not(.views) .tab[aria-selected=true] { background: var(--t-acc); border-color: var(--t-acc); color: var(--t-acc-ink); box-shadow: 0 0 14px var(--t-glow); }
+.chip[aria-pressed=true] { background: rgba(45, 212, 191, .16); color: var(--t-acc2); border-color: var(--t-line2); }
+.filters select, .filters input, .more { background: var(--t-glass); border-color: var(--t-line); border-radius: var(--t-r2); }
+.more { font-family: var(--t-head); text-transform: none; letter-spacing: 0; }
+.more:hover { border-color: var(--t-line2); color: var(--t-acc2); }
+@media (max-width: 1099.98px) { #views.t-nav { position: static; background: transparent; padding: 0 !important; margin: 0 !important; } }
+
+</style>
+<script>
+(function(){try{document.documentElement.setAttribute('data-sport','nhl');document.body.classList.add('t-shell');var n=document.getElementById('views');if(n){n.classList.add('t-nav');n.setAttribute('data-brand','NHL Pick Board');}}catch(e){}})();
+/* Shared board background: soft turquoise glows (CSS) plus sport pieces drifting slowly upward on a canvas.
+   Sport comes from <html data-sport="nba|nfl|nhl">. Static frame when the viewer prefers reduced motion; pauses when the tab is hidden. */
+(function () {
+  try {
+    var sport = (document.documentElement.getAttribute("data-sport") || "nba").toLowerCase();
+    var cv = document.createElement("canvas"); cv.id = "tbg"; cv.setAttribute("aria-hidden", "true");
+    document.body.insertBefore(cv, document.body.firstChild);
+    var ctx = cv.getContext("2d"); if (!ctx) return;
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var W = 0, H = 0, dpr = 1, P = [];
+    function rnd(a, b) { return a + Math.random() * (b - a); }
+    function make(y) { var s = rnd(22, 78); return { x: rnd(0, W), y: y == null ? rnd(0, H) : y, s: s, a: rnd(0, 6.28), va: rnd(-.0035, .0035),
+      vy: -(0.06 + s / 260) * rnd(.7, 1.3), vx: rnd(-.05, .05), o: rnd(.16, .32) * (s > 55 ? 1 : .85), ph: rnd(0, 6.28) }; }
+    function size() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2); W = window.innerWidth; H = window.innerHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var n = W < 700 ? 7 : W < 1200 ? 11 : 15; while (P.length < n) P.push(make()); P.length = n;
+    }
+    function ball(r) { // basketball: circle, two straight seams, two curved seams
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.283); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(-r * 1.05, 0, r * .55, r * .86, 0, -1.2, 1.2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(r * 1.05, 0, r * .55, r * .86, 0, 1.94, 4.34); ctx.stroke();
+    }
+    function football(r) { // pointed oval plus laces
+      ctx.beginPath(); ctx.moveTo(-r, 0); ctx.quadraticCurveTo(0, -r * 1.05, r, 0); ctx.quadraticCurveTo(0, r * 1.05, -r, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-r * .32, 0); ctx.lineTo(r * .32, 0);
+      for (var i = -2; i <= 2; i++) { ctx.moveTo(i * r * .14, -r * .1); ctx.lineTo(i * r * .14, r * .1); } ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-r * .72, -r * .26); ctx.lineTo(-r * .72, r * .26); ctx.moveTo(r * .72, -r * .26); ctx.lineTo(r * .72, r * .26); ctx.stroke();
+    }
+    function puck(r) { // puck seen at an angle: top ellipse, side walls, lower rim
+      var h = r * .34, e = r * .42;
+      ctx.beginPath(); ctx.ellipse(0, -h / 2, r, e, 0, 0, 6.283); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-r, -h / 2); ctx.lineTo(-r, h / 2); ctx.moveTo(r, -h / 2); ctx.lineTo(r, h / 2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, h / 2, r, e, 0, 0, 3.1416); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, -h / 2, r * .55, e * .55, 0, 0, 6.283); ctx.globalAlpha *= .6; ctx.stroke();
+    }
+    var draw = sport === "nfl" ? football : sport === "nhl" ? puck : ball;
+    function frame(t) {
+      ctx.clearRect(0, 0, W, H);
+      for (var i = 0; i < P.length; i++) {
+        var p = P[i];
+        if (!reduce) { p.y += p.vy; p.x += p.vx + Math.sin(t / 4000 + p.ph) * .08; p.a += p.va; }
+        if (p.y < -p.s * 1.4) { P[i] = p = make(H + p.s); p.x = rnd(0, W); }
+        if (p.x < -p.s * 1.4) p.x = W + p.s; if (p.x > W + p.s * 1.4) p.x = -p.s;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a);
+        ctx.globalAlpha = p.o; ctx.strokeStyle = "#5eead4"; ctx.lineWidth = Math.max(1, p.s / 34);
+        ctx.shadowColor = "rgba(45,212,191,.55)"; ctx.shadowBlur = p.s / 5;
+        draw(p.s / 2); ctx.restore();
+      }
+    }
+    var last = 0, run = !reduce;
+    function loop(t) { if (!run) return; if (t - last > 33) { frame(t); last = t; } requestAnimationFrame(loop); }
+    size(); frame(0);
+    window.addEventListener("resize", function () { size(); frame(performance.now()); });
+    document.addEventListener("visibilitychange", function () { if (reduce) return; run = !document.hidden; if (run) requestAnimationFrame(loop); });
+    if (run) requestAnimationFrame(loop);
+  } catch (e) { /* background is decoration only */ }
+})();
+
+</script>
+<!-- theme:end -->

@@ -18,8 +18,9 @@ from ..odds_math import fmt_american
 from .table import _et, team_color, third_color
 
 TEMPLATE = (Path(__file__).parent / "site_template.html").read_text(encoding="utf-8")
-TOP_N_ALL = 30  # All Players tab shows the top N players by EV
+TOP_N_ALL = 3  # Goal scorers tab: the 3 likeliest scorers on the slate (2026-11-25: ranking by EV picked long shots that hit 6%)
 MIN_P_ALL = 0.15  # ...and only players whose model probability is at least this
+SOG_MIN_EV, SOG_TOP_N = 0.04, 5  # Shots tab: +4% EV or better, one per game, at most 5
 STATUS = {"Confirmed": "Confirmed", "Likely": "Likely", "Unconfirmed": "Unconfirmed"}
 
 
@@ -421,6 +422,14 @@ def _sog_payload(con, date, eids=None):
     smx = shot_matchups(con, date, eids)
     out = []
     sog_rows = [r for r in build_sog_rows(con, date) if eids is None or r["event_id"] in eids]
+    # 2026-11-25 tighter card: +4% EV or better, one per game, top 5 a day (history: +2% gave 21/day at -0.2% ROI; this rule +1.3%)
+    keep, seen = [], set()
+    for r in sorted(sog_rows, key=lambda r: -r["ev"]):
+        if r["ev"] >= SOG_MIN_EV and r["event_id"] not in seen:
+            keep.append(r); seen.add(r["event_id"])
+        if len(keep) == SOG_TOP_N:
+            break
+    sog_rows = keep
     for i_, r_ in enumerate(sog_rows):  # keep the numbering 1..N now that hidden games are gone
         r_["rank"], r_["n"] = i_ + 1, len(sog_rows)
     for r in sog_rows:
@@ -664,6 +673,15 @@ def _goalie_panel(con, date, eids=None):
     return out
 
 
+def _card_hist(con):
+    try:
+        from ..regrade import card_history
+        return card_history(con)
+    except Exception as e:  # display-only: never block the build
+        print("card re-grade failed:", e)
+        return None
+
+
 def build_site(date):
     con = connect()
     late = _late_eids(con, date)
@@ -673,7 +691,7 @@ def build_site(date):
     _renumber(rows, True)
     all_rows, _ = build_rows(con, date, all_players=True)
     all_rows = [r for r in all_rows if r["event_id"] in late]
-    all_rows = sorted([r for r in all_rows if r["ev"] is not None and r["p"] >= MIN_P_ALL], key=lambda r: r["rank"])[:TOP_N_ALL]
+    all_rows = sorted([r for r in all_rows if r["ev"] is not None and r["p"] >= MIN_P_ALL], key=lambda r: -r["p"])[:TOP_N_ALL]
     for i_, r_ in enumerate(all_rows):  # renumber 1..N now that the list is filtered
         r_["rank"], r_["pool_n"] = i_ + 1, len(all_rows)
     matchups = team_matchups(con, date, pool_eids)
@@ -687,8 +705,10 @@ def build_site(date):
                             "off": round(m["off"], 2) if m["off"] is not None else None, "p_off": round(m["p_off"] * 100),
                             "def": round(m["def_score"], 1), "p_def": round(m["p_def"] * 100),
                             "score": round(m["score"], 1)} for m in matchups],
-               "rankings": _rankings_payload(con), "xgcuts": _xg_cuts(con), "splits": _safe_splits(con, date), "lineups": _lineups_payload(con), "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, pool_eids), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con)}
+               "rankings": _rankings_payload(con), "xgcuts": _xg_cuts(con), "splits": _safe_splits(con, date), "lineups": _lineups_payload(con), "parlays": build_parlays(con, date), "parlay_hist": _parlay_history(con, date), "missing": [m[0] for m in missing], "goalies": _goalie_panel(con, date, pool_eids), "sog": _sog_payload(con, date, late), "games": _games_payload(con, date, late), "safe": _safest_payload(con, date, late), "results": _results(con), "card_hist": _card_hist(con), "mode": "board"}
     html = TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload, ensure_ascii=False))
+    # Tim Hortons pools live on their own page now (2026-11-25): same data, only the Tims view; published as its own artifact by the tims skill
+    (DATA / f"tims_{date}.html").write_text(TEMPLATE.replace("<title>NHL Pick Board</title>", "<title>Tim Hortons Picks</title>").replace("/*__DATA__*/null", json.dumps({**payload, "mode": "tims"}, ensure_ascii=False)), encoding="utf-8")
     f = DATA / f"site_{date}.html"  # artifact variant (host adds the document skeleton)
     f.write_text(html, encoding="utf-8")
     # standalone variant: opens directly in a browser; always the latest build
