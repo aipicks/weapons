@@ -51,7 +51,7 @@ def main():
             log("update_daily failed; stopping")
             return 2
         con = sqlite3.connect("data/nhl.db")
-        day = con.execute("SELECT MAX(date) FROM pred_log").fetchone()[0]
+        day = datetime.date.today().isoformat()  # the board date (this PC runs on Eastern time)
         now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
         n = con.execute("DELETE FROM pred_log WHERE date=? AND settled=0 AND start>?", (day, now)).rowcount
         con.commit()
