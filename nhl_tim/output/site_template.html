@@ -193,6 +193,12 @@ h1 span{color:var(--accent)}
 </div>
 <script>
 const D = /*__DATA__*/null;
+// Finished games drop off (puck drop + 3.5 h), even before the next rebuild; Results keep the graded picks.
+(function pruneFinished() {
+  const done = iso => iso && Date.now() > Date.parse(iso) + 3.5 * 3600e3;
+  const old = x => x && typeof x === 'object' && (done(x.start) || (Array.isArray(x.legs) && x.legs.some(l => l && done(l.start))));
+  ['rows', 'all', 'sog', 'games', 'safe', 'parlays', 'matchups', 'missing'].forEach(k => { if (Array.isArray(D[k])) D[k] = D[k].filter(x => !old(x)); });
+})();
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pools = [...new Set(D.rows.map(r => r.pool))].sort();
