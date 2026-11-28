@@ -104,12 +104,15 @@ def build_sog_rows(con, date):
            JOIN player p USING(nhl_id) WHERE a.season=? AND a.gp>=40 GROUP BY p.pos""", (PREV_SEASON,))}
     teams_prev = {r["team"]: r for r in con.execute("SELECT * FROM team_season WHERE season=?", (PREV_SEASON,))}
     teams_cur = {r["team"]: r for r in con.execute("SELECT * FROM team_season WHERE season=?", (CUR_SEASON,))}
-    sa_all = [t["sa_pg"] for t in teams_prev.values() if t["sa_pg"]]
+    # opponent team stats use THIS season only (user, 2026-11-28); last season is a fallback for a team with no games yet.
+    # League averages come from the same season so each opponent is compared with this season's league.
+    sa_all = [t["sa_pg"] for t in (teams_cur or teams_prev).values() if t["sa_pg"]]
     league_sa = sum(sa_all) / len(sa_all) if sa_all else 30.0
     att_prev = {r["team"]: r for r in con.execute("SELECT * FROM team_att WHERE season=? AND gp>0", (PREV_SEASON,))}
     att_cur = {r["team"]: r for r in con.execute("SELECT * FROM team_att WHERE season=? AND gp>0", (CUR_SEASON,))}
-    lg_att = (sum(t["att_a"] for t in att_prev.values()) / sum(t["gp"] for t in att_prev.values())) if att_prev else None
-    lg_ot = (sum(t["sog_a"] for t in att_prev.values()) / sum(t["att_a"] for t in att_prev.values())) if att_prev else None
+    att_lg = att_cur or att_prev
+    lg_att = (sum(t["att_a"] for t in att_lg.values()) / sum(t["gp"] for t in att_lg.values())) if att_lg else None
+    lg_ot = (sum(t["sog_a"] for t in att_lg.values()) / sum(t["att_a"] for t in att_lg.values())) if att_lg else None
 
     def _ranks(rows_, key, desc=False):
         order = sorted(rows_, key=lambda t: key(rows_[t]), reverse=desc)
@@ -121,10 +124,12 @@ def build_sog_rows(con, date):
                          "ot": _ranks(rows_, lambda t: t["sog_a"] / t["att_a"])}
     pos_prev = {r["team"]: r for r in con.execute("SELECT * FROM team_pos_sa WHERE season=?", (PREV_SEASON,))}
     pos_cur = {r["team"]: r for r in con.execute("SELECT * FROM team_pos_sa WHERE season=?", (CUR_SEASON,))}
-    lg_pos = {k: (sum(t[f"sa_{k}_pg"] for t in pos_prev.values()) / len(pos_prev)) if pos_prev else None for k in ("f", "d")}
+    pos_lg = pos_cur or pos_prev
+    lg_pos = {k: (sum(t[f"sa_{k}_pg"] for t in pos_lg.values()) / len(pos_lg)) if pos_lg else None for k in ("f", "d")}
     cur_def = current_defense(con)
-    pk_prev = [r[0] for r in con.execute("SELECT pk_toi_pg FROM team_pk_toi WHERE season=?", (PREV_SEASON,))]
-    league_pk = sum(pk_prev) / len(pk_prev) if pk_prev else None
+    pk_lg = [r[0] for r in con.execute("SELECT pk_toi_pg FROM team_pk_toi WHERE season=?", (CUR_SEASON,))] or \
+        [r[0] for r in con.execute("SELECT pk_toi_pg FROM team_pk_toi WHERE season=?", (PREV_SEASON,))]
+    league_pk = sum(pk_lg) / len(pk_lg) if pk_lg else None
 
     team_xg = {}
     for eid, g in games.items():
@@ -182,15 +187,15 @@ def build_sog_rows(con, date):
             att = {"rate": att_rate, "ot": ot, "mu": mu_att, "prev": a_prev, "cur": a_cur}
 
         oc, op = teams_cur.get(opp), teams_prev.get(opp)
-        wo = (oc["gp"] / (oc["gp"] + SOG["opp_k"])) if oc and oc["sa_pg"] else 0.0
-        sa_eff = (1 - wo) * op["sa_pg"] + wo * oc["sa_pg"] if op and op["sa_pg"] and wo else (op["sa_pg"] if op and op["sa_pg"] else league_sa)
+        wo = 1.0 if oc and oc["gp"] and oc["sa_pg"] else 0.0   # this season only once the opponent has played
+        sa_eff = oc["sa_pg"] if wo else (op["sa_pg"] if op and op["sa_pg"] else league_sa)
         f_opp = (sa_eff / league_sa) ** SOG["opp_exp"]
         # shots the opponent allows to this player's position group (forwards or defensemen) replace the all-shooter rate
         grp = "d" if p["pos"] == "D" else "f"
         pp_, pc_ = pos_prev.get(opp), pos_cur.get(opp)
-        if pp_ and lg_pos.get(grp):
-            wpos = pc_["gp"] / (pc_["gp"] + SOG["opp_k"]) if pc_ else 0.0
-            sa_pos = (1 - wpos) * pp_[f"sa_{grp}_pg"] + wpos * pc_[f"sa_{grp}_pg"] if pc_ else pp_[f"sa_{grp}_pg"]
+        pos_use = pc_ if pc_ and pc_["gp"] else pp_
+        if pos_use and lg_pos.get(grp):
+            sa_pos = pos_use[f"sa_{grp}_pg"]
             f_opp = (sa_pos / lg_pos[grp]) ** SOG["opp_exp"]
 
         toi_p = _one(con, "SELECT toi_pg FROM player_toi WHERE nhl_id=? AND season=?", pid, PREV_SEASON)
@@ -205,7 +210,7 @@ def build_sog_rows(con, date):
         pp_use = (1 - wc) * pp_p + wc * pp_c if pp_c is not None else pp_p
         pk_p = _one(con, "SELECT pk_toi_pg FROM team_pk_toi WHERE team=? AND season=?", opp, PREV_SEASON)
         pk_c = _one(con, "SELECT pk_toi_pg FROM team_pk_toi WHERE team=? AND season=?", opp, CUR_SEASON)
-        pk_use = ((1 - wo) * pk_p + wo * pk_c) if (pk_p and pk_c is not None and wo) else pk_p
+        pk_use = pk_c if pk_c is not None else pk_p   # opponent shorthanded time: this season only
         # share of his shots that come on the power play, scaled by how much more (or less) shorthanded time this
         # opponent gives up than the league average
         toi_use = toi_c or toi_p or 1100.0
@@ -216,10 +221,10 @@ def build_sog_rows(con, date):
         # the opponent's attempt volume allowed and its on-target share (blocks and misses). The two are then blended.
         oa_p, oa_c = att_prev.get(opp), att_cur.get(opp)
         f_att = 1.0
-        if oa_p and lg_att and lg_ot:
-            wa = oa_c["gp"] / (oa_c["gp"] + SOG["opp_k"]) if oa_c else 0.0
-            att_pg = (1 - wa) * oa_p["att_a"] / oa_p["gp"] + (wa * oa_c["att_a"] / oa_c["gp"] if oa_c else 0.0)
-            ot_al = (1 - wa) * oa_p["sog_a"] / oa_p["att_a"] + (wa * oa_c["sog_a"] / oa_c["att_a"] if oa_c else 0.0)
+        oa = oa_c or oa_p   # this season only; last season only if the opponent has no games yet
+        if oa and lg_att and lg_ot:
+            att_pg = oa["att_a"] / oa["gp"]
+            ot_al = oa["sog_a"] / oa["att_a"]
             f_att = (att_pg / lg_att) ** SOG["opp_exp"] * (ot_al / lg_ot) ** SOG["ot_opp_exp"]
         mu_shots = mu0 * f_opp
         if att:

@@ -1,7 +1,7 @@
 """Shots matchup score per team playing today, one for forwards and one for defensemen.
 
-For each team's skaters, the opponent is judged on what it allows (this season blended with last season by games
-played), ranked among the opponents on the slate so 1 = the best spot for shooters:
+For each team's skaters, the opponent is judged on what it allows (this season only; last season only for a team
+with no games yet, user 2026-11-28), ranked among the opponents on the slate so 1 = the best spot for shooters:
   attempts allowed per game, shots on goal allowed per game, shots allowed to that position group (forwards or
   defensemen) per game, share of attempts blocked (fewer is better), share of attempts that reach the net (more is
   better). The score is the weighted average of those ranks (config.SHOTMATCH), then ranked 1..N."""
@@ -14,12 +14,9 @@ def _rank(vals, desc):
 
 
 def _blend(prev, cur, key):
-    if prev is None:
-        return None
-    if cur is None:
-        return prev[key]
-    w = cur["gp"] / (cur["gp"] + SOG["opp_k"])
-    return (1 - w) * prev[key] + w * cur[key]
+    if cur is not None and cur["gp"]:
+        return cur[key]
+    return prev[key] if prev is not None else None
 
 
 def shot_matchups(con, date, eids=None):
